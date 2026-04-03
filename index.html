@@ -229,7 +229,10 @@ function renderHistory() {
 document.getElementById('connectBtn').addEventListener('click', async () => {
     try {
         const device = await navigator.bluetooth.requestDevice({
-            filters: [{ namePrefix: 'VBT' }],
+            filters: [
+                { namePrefix: 'BBC micro:bit' },
+                { namePrefix: 'VBT' }
+            ],
             optionalServices: [SERVICE_UUID]
         });
         const server = await device.gatt.connect();
