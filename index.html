@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>micro:bit VBT Ultra v1.0</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root { --bg-color: #000000; --panel-bg: #FFFFFF; --primary: #FF5200; --success: #008000; --info: #0000FF; --warning: #FF8F00; --text-dark: #000000; --text-light: #FFFFFF; }
+  body { font-family: -apple-system, sans-serif; background: var(--bg-color); color: var(--text-light); margin: 0; padding: 10px; padding-bottom: 60px; }
+  .header { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; margin-bottom: 5px; }
+  .title { font-size: 1.1rem; font-weight: 900; color: var(--primary); }
+  .top-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  #connectBtn { flex: 2; background: var(--primary); color: white; border: 2px solid white; padding: 12px; border-radius: 10px; font-weight: 900; font-size: 1rem; }
+  #connectBtn.connected { background: #FFFFFF; color: #00C853; border: 2px solid #00C853; }
+  #resetBtn { flex: 1; background: #333; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 0.9rem; }
+  #configToggle { flex: 0.6; background: #222; color: #AAA; border: 1px solid #444; padding: 12px; border-radius: 10px; font-size: 1rem; }
+  
+  .config-overlay { display: none; background: #1A1A1A; border-radius: 12px; padding: 15px; margin-top: 10px; border: 1px solid #444; text-align: left; }
+  .config-overlay.open { display: block; }
+  .config-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .config-row label { font-size: 0.8rem; color: #CCC; }
+  .config-row select, .config-row input { background: #000; color: #FFF; border: 1px solid #555; padding: 5px; border-radius: 4px; width: 85px; text-align: center; }
+
+  .profile-bar { display: flex; gap: 5px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 5px; }
+  .profile-btn { background: #222; color: #888; border: 1px solid #333; padding: 8px 15px; border-radius: 20px; font-size: 0.85rem; white-space: nowrap; cursor: pointer; }
+  .profile-btn.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: bold; }
+
+  .main-panel { background: var(--panel-bg); color: var(--text-dark); border-radius: 15px; padding: 20px; box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+  .val-mega { font-size: 4.5rem; font-weight: 900; line-height: 1; display: block; margin: 5px 0; }
+  .val-sub { font-size: 2.2rem; font-weight: 900; line-height: 1; display: block; }
+  .chart-box { background: #FFF; margin-top: 10px; padding: 5px; border-radius: 10px; height: 160px; }
+  .monitor-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #111; border-top: 1px solid #333; padding: 8px 15px; font-family: monospace; font-size: 0.7rem; color: #00FF00; display: flex; justify-content: space-between; align-items: center; }
+  .hidden { display: none !important; }
+  
+  .dir-idle { background: #444; color: #EEE; }
+  .dir-up { background: #FF5200; color: #FFF; }
+  .dir-down { background: #00C853; color: #FFF; }
+</style>
+</head>
+<body>
+  <div class="header"><span class="title">VBT ULTRA 1kHz</span><div><span id="dirIndicator" class="dir-idle" style="font-size:0.7rem;font-weight:bold;padding:2px 6px;border-radius:4px;">待機</span><span id="status" style="font-size:0.6rem; color:#666; margin-left:5px;">尚未連線</span></div></div>
+  
+  <div class="top-bar"><button id="connectBtn">連接 micro:bit</button><button id="resetBtn">新組數</button><button id="configToggle">⚙️</button></div>
+
+  <div class="profile-bar" id="profileBar">
+    <div class="profile-btn active" onclick="switchProfile('deadlift')">硬舉</div>
+    <div class="profile-btn" onclick="switchProfile('squat')">深蹲</div>
+    <div class="profile-btn" onclick="switchProfile('bench')">臥推</div>
+    <div class="profile-btn" onclick="switchProfile('snatch')">抓舉</div>
+  </div>
+
+  <div id="configPanel" class="config-overlay">
+    <div style="font-weight:bold; color:var(--warning); margin-bottom:12px;">進階設定 (<span id="currentProfileName">硬舉</span>)</div>
+    <div class="config-row"><label>語音模式</label><select id="cfgVoiceMode"><option value="none">關閉</option><option value="avg" selected>平均</option><option value="peak">峰值</option><option value="both">兩者</option></select></div>
+    <div class="config-row"><label>語音語速</label><input type="number" id="cfgVoiceRate" step="0.1" value="1.6"></div>
+    <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+    <div class="config-row"><label>啟動靈敏度(G)</label><input type="number" id="cfgStart" step="0.01"></div>
+    <div class="config-row"><label>結束緩衝(幀)</label><input type="number" id="cfgEnd" step="1"></div>
+    <div class="config-row"><label>最低有效速(m/s)</label><input type="number" id="cfgMinV" step="0.01"></div>
+    <div style="display:flex; gap:8px; margin-top:10px;"><button onclick="saveSettings()" style="background:var(--warning); color:#000; flex:1; font-size:0.8rem; padding:10px;">儲存此配置</button><button onclick="resetToProfileDefault()" style="background:#444; color:#FFF; flex:0.6; font-size:0.8rem; padding:10px;">恢復預設</button></div>
+  </div>
+
+  <div class="main-panel">
+    <div style="border-bottom:2px solid #EEE; padding-bottom:10px;"><span id="repsText" class="val-mega">0</span><span style="font-size:0.8rem;color:#666;font-weight:bold;">REPS</span></div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+      <div><span id="avgText" class="val-sub" style="color:var(--success);">--</span><span style="font-size:0.7rem;color:#666;">AVG m/s</span></div>
+      <div><span id="peakText" class="val-sub" style="color:var(--info);">--</span><span style="font-size:0.7rem;color:#666;">PEAK m/s</span></div>
+    </div>
+  </div>
+
+  <div id="waveBox" class="chart-box"><canvas id="waveChart"></canvas></div>
+  <div class="chart-box"><canvas id="trendChart"></canvas></div>
+
+  <div style="background:#222; padding:15px; border-radius:12px; margin-top:15px;"><input type="text" id="setNote" placeholder="輸入備註" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:none; box-sizing:border-box;"><div style="display:flex; gap:10px;"><button id="saveBtn" style="background:var(--success); color:#FFF; flex:1;">儲存本組</button><button id="exportBtn" style="background:var(--info); color:#FFF; flex:0.4;">匯出</button></div></div>
+  <div style="margin-top:20px; text-align:left;"><h3 style="color:#FFF; font-size:1.1rem;">歷史紀錄</h3><div id="historyList"></div></div>
+  <div class="monitor-footer"><div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div><div id="fpsDisplay">0 Hz</div></div>
+
+<script>
+// --- 運動配置檔 ---
+const PROFILES = {
+    deadlift: { name: '硬舉', start: 0.08, dead: 0.07, end: 150, minV: 0.15 }, // 1kHz 下 End 幀數需放大
+    squat:    { name: '深蹲', start: 0.10, dead: 0.07, end: 100, minV: 0.20 },
+    bench:    { name: '臥推', start: 0.06, dead: 0.05, end: 120, minV: 0.15 },
+    snatch:   { name: '抓舉', start: 0.15, dead: 0.10, end: 50,  minV: 0.35 }
+};
+
+let currentProfileKey = 'deadlift';
+let settings = { ...PROFILES.deadlift, voiceMode: 'avg', voiceRate: 1.6, showWave: true };
+
+// --- BLE 與 數據解析 ---
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+let rxBuffer = new Uint8Array(0);
+
+// --- VBT 引擎變數 ---
+let gravityVec = {x:0, y:0, z:1}, gravityMag = 1.0, velocity = 0.0, maxVelocity = 0.0, velocities = [], state = 0, startTime = 0, calibBuffer = [], isCalibrated = false, currentSetData = [], lowVelocityCount = 0, packetCount = 0, lastFpsTime = Date.now(), lastPacketTime = Date.now();
+
+// --- 圖表初始化 ---
+const trendChart = new Chart(document.getElementById('trendChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ label: 'Avg', data: [], borderColor: '#008000', borderWidth: 3, tension: 0.2, fill: false }, { label: 'Peak', data: [], borderColor: '#0000FF', borderWidth: 3, tension: 0.2, fill: false }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#EEE' } } }, plugins: { legend: { display: false }, title: { display: true, text: '組數趨勢' } } } });
+const waveChart = new Chart(document.getElementById('waveChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#FF5200', borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: 'rgba(255,82,0,0.1)' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#EEE' } } }, plugins: { legend: { display: false }, title: { display: true, text: '單次速度波形' } }, animation: false } });
+
+function speak(text) { if (settings.voiceMode === 'none') return; window.speechSynthesis.cancel(); const msg = new SpeechSynthesisUtterance(text); msg.lang = 'zh-TW'; msg.rate = settings.voiceRate; window.speechSynthesis.speak(msg); }
+
+function updateVBT(x, y, z) {
+    lastPacketTime = Date.now();
+    packetCount++;
+    if (Date.now() - lastFpsTime >= 1000) { 
+        document.getElementById('fpsDisplay').innerText = packetCount + " Hz"; 
+        packetCount = 0; lastFpsTime = Date.now(); 
+    }
+    
+    // 顯示即時 RAW 數據
+    document.getElementById('rX').innerText = x.toFixed(2);
+    document.getElementById('rY').innerText = y.toFixed(2);
+    document.getElementById('rZ').innerText = z.toFixed(2);
+
+    // 1. 自動校準 (前 500 點)
+    if (!isCalibrated) {
+        calibBuffer.push({x, y, z});
+        if (calibBuffer.length >= 500) {
+            let sX = calibBuffer.reduce((a,b)=>a+b.x, 0)/500, sY = calibBuffer.reduce((a,b)=>a+b.y, 0)/500, sZ = calibBuffer.reduce((a,b)=>a+b.z, 0)/500;
+            gravityVec = {x:sX, y:sY, z:sZ};
+            gravityMag = Math.sqrt(sX**2 + sY**2 + sZ**2);
+            isCalibrated = true;
+            document.getElementById('status').innerText = '狀態：已校準';
+        }
+        return null;
+    }
+
+    // 2. 向量投影與重力抵銷
+    let dot = (x * gravityVec.x + y * gravityVec.y + z * gravityVec.z) / gravityMag;
+    let netAccel = -(dot - gravityMag);
+
+    const dirInd = document.getElementById('dirIndicator');
+    if (netAccel > 0.05) { dirInd.innerText = "向上"; dirInd.className = "dir-up"; } 
+    else if (netAccel < -0.05) { dirInd.innerText = "向下"; dirInd.className = "dir-down"; } 
+    else { dirInd.innerText = "待機"; dirInd.className = "dir-idle"; }
+
+    if (Math.abs(netAccel) < settings.dead) { 
+        netAccel = 0.0; 
+        if (state === 0) { velocity = 0.0; return null; }
+    }
+
+    // 3. 數值積分 (1ms Step)
+    velocity += netAccel * 9.81 * 0.001; 
+
+    // 4. 狀態機 (0:待機, 1:啟動, 2:運動中, 3:完成)
+    if (state === 0 && netAccel > settings.start) {
+        state = 1; startTime = Date.now(); velocities = []; maxVelocity = 0.0; lowVelocityCount = 0;
+        waveChart.data.labels = []; waveChart.data.datasets[0].data = [];
+    }
+    else if (state === 1 && velocity > 0.05) { state = 2; }
+    else if (state === 2) {
+        if (velocity > 0) {
+            velocities.push(velocity);
+            if (velocity > maxVelocity) maxVelocity = velocity;
+            lowVelocityCount = 0;
+            if (velocities.length % 10 === 0) { // 降頻繪圖，節省效能
+                waveChart.data.labels.push(""); waveChart.data.datasets[0].data.push(velocity.toFixed(3));
+                waveChart.update('none');
+            }
+        } else {
+            lowVelocityCount++;
+        }
+        if ((velocity < 0.05 && velocities.length > 50 && lowVelocityCount > settings.end) || (Date.now() - startTime > 10000)) state = 3;
+    } 
+    else if (state === 3) {
+        let res = (velocities.length > 50 && maxVelocity > settings.minV) ? {avg: velocities.reduce((a, b) => a + b, 0) / velocities.length, peak: maxVelocity} : null;
+        state = 0; velocity = 0.0;
+        return res;
+    }
+    return null;
+}
+
+// --- UI 與 歷史紀錄 ---
+function switchProfile(key) {
+    currentProfileKey = key;
+    document.querySelectorAll('.profile-btn').forEach(b => b.classList.toggle('active', b.innerText === PROFILES[key].name));
+    document.getElementById('currentProfileName').innerText = PROFILES[key].name;
+    const saved = localStorage.getItem(`vbt_settings_${key}`);
+    settings = saved ? JSON.parse(saved) : { ...settings, ...PROFILES[key] };
+    applyToUI();
+}
+function applyToUI() {
+    document.getElementById('cfgStart').value = settings.start;
+    document.getElementById('cfgEnd').value = settings.end;
+    document.getElementById('cfgVoiceMode').value = settings.voiceMode;
+    document.getElementById('cfgVoiceRate').value = settings.voiceRate;
+    document.getElementById('cfgMinV').value = settings.minV;
+}
+function saveSettings() {
+    settings.start = parseFloat(document.getElementById('cfgStart').value);
+    settings.end = parseInt(document.getElementById('cfgEnd').value);
+    settings.voiceMode = document.getElementById('cfgVoiceMode').value;
+    settings.voiceRate = parseFloat(document.getElementById('cfgVoiceRate').value);
+    settings.minV = parseFloat(document.getElementById('cfgMinV').value);
+    localStorage.setItem(`vbt_settings_${currentProfileKey}`, JSON.stringify(settings));
+    document.getElementById('configPanel').classList.remove('open');
+}
+function resetToProfileDefault() {
+    if(confirm('重置？')) { switchProfile(currentProfileKey); saveSettings(); }
+}
+
+function addRepToUI(res) {
+    currentSetData.push(res);
+    document.getElementById('avgText').innerText = res.avg.toFixed(2);
+    document.getElementById('peakText').innerText = res.peak.toFixed(2);
+    document.getElementById('repsText').innerText = currentSetData.length;
+    let t = (settings.voiceMode === 'avg') ? res.avg.toFixed(2) : (settings.voiceMode === 'peak') ? res.peak.toFixed(2) : (settings.voiceMode === 'both') ? `${res.avg.toFixed(2)}, ${res.peak.toFixed(2)}` : "";
+    if(t) speak(t);
+    trendChart.data.labels.push(currentSetData.length);
+    trendChart.data.datasets[0].data.push(res.avg.toFixed(2));
+    trendChart.data.datasets[1].data.push(res.peak.toFixed(2));
+    trendChart.update();
+}
+
+function renderHistory() {
+    const history = JSON.parse(localStorage.getItem('vbt_history') || '[]');
+    document.getElementById('historyList').innerHTML = history.map((set, i) => `
+        <div style="background:#1A1A1A; padding:10px; border-radius:8px; margin-bottom:10px; border-left:4px solid var(--primary);">
+            <div style="color:var(--primary); font-size:0.7rem; font-weight:900;">${set.date}</div>
+            <div style="font-weight:bold;">${set.note || '無備註'} - ${set.reps} Reps</div>
+            <div style="font-size:0.8rem; color:#AAA;">Avg: ${set.avgV} m/s</div>
+        </div>
+    `).join('');
+}
+
+document.getElementById('connectBtn').addEventListener('click', async () => {
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: 'VBT' }],
+            optionalServices: [SERVICE_UUID]
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        const char = await service.getCharacteristic(CHAR_UUID);
+        
+        await char.startNotifications();
+        document.getElementById('connectBtn').classList.add('connected');
+        document.getElementById('connectBtn').innerText = '已連線';
+        document.getElementById('status').innerText = '狀態：等待校準 (請靜置)';
+        isCalibrated = false; calibBuffer = [];
+
+        char.addEventListener('characteristicvaluechanged', (e) => {
+            let data = new Uint8Array(e.target.value.buffer);
+            let combined = new Uint8Array(rxBuffer.length + data.length);
+            combined.set(rxBuffer); combined.set(data, rxBuffer.length);
+            rxBuffer = combined;
+
+            while (rxBuffer.length >= 128) {
+                let packet = rxBuffer.slice(0, 128);
+                rxBuffer = rxBuffer.slice(128);
+                let view = new DataView(packet.buffer);
+                let scale = packet[120];
+                if (scale === 0) scale = 8;
+
+                for (let i = 0; i < 120; i += 6) {
+                    let x = (view.getInt16(i, false) / 32768.0) * scale;
+                    let y = (view.getInt16(i+2, false) / 32768.0) * scale;
+                    let z = (view.getInt16(i+4, false) / 32768.0) * scale;
+                    let result = updateVBT(x, y, z);
+                    if (result) addRepToUI(result);
+                }
+            }
+        });
+    } catch (e) { alert(e); }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => { 
+    currentSetData = []; document.getElementById('repsText').innerText="0"; 
+    document.getElementById('avgText').innerText="--"; document.getElementById('peakText').innerText="--";
+    trendChart.data.labels=[]; trendChart.data.datasets.forEach(d=>d.data=[]); trendChart.update();
+});
+
+document.getElementById('configToggle').addEventListener('click', () => document.getElementById('configPanel').classList.toggle('open'));
+switchProfile('deadlift'); renderHistory();
+</script>
+</body>
+</html>
