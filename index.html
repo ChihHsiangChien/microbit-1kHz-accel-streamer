@@ -61,44 +61,71 @@
     <div style="display:flex; gap:8px; margin-top:10px;"><button onclick="saveSettings()" style="background:var(--warning); color:#000; flex:1; font-size:0.8rem; padding:10px;">儲存此配置</button><button onclick="resetToProfileDefault()" style="background:#444; color:#FFF; flex:0.6; font-size:0.8rem; padding:10px;">恢復預設</button></div>
   </div>
 
-  <div class="main-panel">
-    <div style="border-bottom:2px solid #EEE; padding-bottom:10px;"><span id="repsText" class="val-mega">0</span><span style="font-size:0.8rem;color:#666;font-weight:bold;">REPS</span></div>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-      <div><span id="avgText" class="val-sub" style="color:var(--success);">--</span><span style="font-size:0.7rem;color:#666;">AVG m/s</span></div>
-      <div><span id="peakText" class="val-sub" style="color:var(--info);">--</span><span style="font-size:0.7rem;color:#666;">PEAK m/s</span></div>
-    </div>
+  <!-- 頁籤切換 -->
+  <div style="display:flex; margin-bottom:10px; border-bottom:1px solid #333;">
+    <div id="tabVbt" class="profile-btn active" style="flex:1; border-radius:0; text-align:center;" onclick="switchTab('vbt')">VBT 分析</div>
+    <div id="tabRaw" class="profile-btn" style="flex:1; border-radius:0; text-align:center;" onclick="switchTab('raw')">原始數據 (RAW)</div>
   </div>
 
-  <div id="waveBox" class="chart-box"><canvas id="waveChart"></canvas></div>
-  <div class="chart-box"><canvas id="trendChart"></canvas></div>
+  <div id="vbtView">
+    <div class="main-panel">
+      <div style="border-bottom:2px solid #EEE; padding-bottom:10px;"><span id="repsText" class="val-mega">0</span><span style="font-size:0.8rem;color:#666;font-weight:bold;">REPS</span></div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+        <div><span id="avgText" class="val-sub" style="color:var(--success);">--</span><span style="font-size:0.7rem;color:#666;">AVG m/s</span></div>
+        <div><span id="peakText" class="val-sub" style="color:var(--info);">--</span><span style="font-size:0.7rem;color:#666;">PEAK m/s</span></div>
+      </div>
+    </div>
 
-  <div style="background:#222; padding:15px; border-radius:12px; margin-top:15px;"><input type="text" id="setNote" placeholder="輸入備註" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:none; box-sizing:border-box;"><div style="display:flex; gap:10px;"><button id="saveBtn" style="background:var(--success); color:#FFF; flex:1;">儲存本組</button><button id="exportBtn" style="background:var(--info); color:#FFF; flex:0.4;">匯出</button></div></div>
-  <div style="margin-top:20px; text-align:left;"><h3 style="color:#FFF; font-size:1.1rem;">歷史紀錄</h3><div id="historyList"></div></div>
+    <div id="waveBox" class="chart-box"><canvas id="waveChart"></canvas></div>
+    <div class="chart-box"><canvas id="trendChart"></canvas></div>
+
+    <div style="background:#222; padding:15px; border-radius:12px; margin-top:15px;"><input type="text" id="setNote" placeholder="輸入備註" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:none; box-sizing:border-box;"><div style="display:flex; gap:10px;"><button id="saveBtn" style="background:var(--success); color:#FFF; flex:1;">儲存本組</button><button id="exportBtn" style="background:var(--info); color:#FFF; flex:0.4;">匯出</button></div></div>
+    <div style="margin-top:20px; text-align:left;"><h3 style="color:#FFF; font-size:1.1rem;">歷史紀錄</h3><div id="historyList"></div></div>
+  </div>
+
+  <div id="rawView" class="hidden">
+    <div class="chart-box" style="height:400px; background:#000;"><canvas id="rawChart"></canvas></div>
+    <div style="padding:15px; font-size:0.8rem; color:#888;">* 為維持效能，RAW 圖表採 10:1 採樣顯示 (約 100Hz)</div>
+  </div>
+
   <div class="monitor-footer"><div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div><div id="fpsDisplay">0 Hz</div></div>
 
 <script>
+// --- 導覽切換 ---
+function switchTab(mode) {
+    document.getElementById('vbtView').classList.toggle('hidden', mode !== 'vbt');
+    document.getElementById('rawView').classList.toggle('hidden', mode !== 'raw');
+    document.getElementById('tabVbt').classList.toggle('active', mode === 'vbt');
+    document.getElementById('tabRaw').classList.toggle('active', mode === 'raw');
+}
+
 // --- 運動配置檔 ---
 const PROFILES = {
-    deadlift: { name: '硬舉', start: 0.08, dead: 0.07, end: 150, minV: 0.15 }, // 1kHz 下 End 幀數需放大
-    squat:    { name: '深蹲', start: 0.10, dead: 0.07, end: 100, minV: 0.20 },
-    bench:    { name: '臥推', start: 0.06, dead: 0.05, end: 120, minV: 0.15 },
-    snatch:   { name: '抓舉', start: 0.15, dead: 0.10, end: 50,  minV: 0.35 }
-};
-
-let currentProfileKey = 'deadlift';
-let settings = { ...PROFILES.deadlift, voiceMode: 'avg', voiceRate: 1.6, showWave: true };
-
-// --- BLE 與 數據解析 ---
-const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-let rxBuffer = new Uint8Array(0);
-
-// --- VBT 引擎變數 ---
-let gravityVec = {x:0, y:0, z:1}, gravityMag = 1.0, velocity = 0.0, maxVelocity = 0.0, velocities = [], state = 0, startTime = 0, calibBuffer = [], isCalibrated = false, currentSetData = [], lowVelocityCount = 0, packetCount = 0, lastFpsTime = Date.now(), lastPacketTime = Date.now();
-
-// --- 圖表初始化 ---
+    deadlift: { name: '硬舉', start: 0.08, dead: 0.07, end: 150, minV: 0.15 },
+...
 const trendChart = new Chart(document.getElementById('trendChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ label: 'Avg', data: [], borderColor: '#008000', borderWidth: 3, tension: 0.2, fill: false }, { label: 'Peak', data: [], borderColor: '#0000FF', borderWidth: 3, tension: 0.2, fill: false }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#EEE' } } }, plugins: { legend: { display: false }, title: { display: true, text: '組數趨勢' } } } });
 const waveChart = new Chart(document.getElementById('waveChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#FF5200', borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: 'rgba(255,82,0,0.1)' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#EEE' } } }, plugins: { legend: { display: false }, title: { display: true, text: '單次速度波形' } }, animation: false } });
+
+// 新增：RAW 圖表
+const rawChart = new Chart(document.getElementById('rawChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: Array(100).fill(""),
+        datasets: [
+            { label: 'X', data: Array(100).fill(0), borderColor: 'red', borderWidth: 1, pointRadius: 0, fill: false },
+            { label: 'Y', data: Array(100).fill(0), borderColor: 'green', borderWidth: 1, pointRadius: 0, fill: false },
+            { label: 'Z', data: Array(100).fill(0), borderColor: 'blue', borderWidth: 1, pointRadius: 0, fill: false }
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { min: -16, max: 16, grid: { color: '#333' }, ticks: { color: '#888' } } },
+        plugins: { legend: { display: true, labels: { color: '#FFF' } } },
+        animation: false
+    }
+});
+
+let rawUpdateCounter = 0;
 
 function speak(text) { if (settings.voiceMode === 'none') return; window.speechSynthesis.cancel(); const msg = new SpeechSynthesisUtterance(text); msg.lang = 'zh-TW'; msg.rate = settings.voiceRate; window.speechSynthesis.speak(msg); }
 
@@ -110,13 +137,24 @@ function updateVBT(x, y, z) {
         packetCount = 0; lastFpsTime = Date.now(); 
     }
     
-    // 顯示即時 RAW 數據
+    // 更新實時數值
     document.getElementById('rX').innerText = x.toFixed(2);
     document.getElementById('rY').innerText = y.toFixed(2);
     document.getElementById('rZ').innerText = z.toFixed(2);
 
+    // 更新 RAW 圖表 (10:1 降頻)
+    rawUpdateCounter++;
+    if (rawUpdateCounter >= 10) {
+        rawChart.data.datasets[0].data.push(x);
+        rawChart.data.datasets[1].data.push(y);
+        rawChart.data.datasets[2].data.push(z);
+        rawChart.data.datasets.forEach(d => d.data.shift());
+        rawChart.update('none');
+        rawUpdateCounter = 0;
+    }
+
     // 1. 自動校準 (前 500 點)
-    if (!isCalibrated) {
+...    if (!isCalibrated) {
         calibBuffer.push({x, y, z});
         if (calibBuffer.length >= 500) {
             let sX = calibBuffer.reduce((a,b)=>a+b.x, 0)/500, sY = calibBuffer.reduce((a,b)=>a+b.y, 0)/500, sZ = calibBuffer.reduce((a,b)=>a+b.z, 0)/500;
@@ -227,6 +265,10 @@ function renderHistory() {
 }
 
 document.getElementById('connectBtn').addEventListener('click', async () => {
+    if (!navigator.bluetooth) {
+        alert("您的瀏覽器不支援 Web Bluetooth，或者您正處於不安全的連線環境 (需要 HTTPS 或 localhost/127.0.0.1)。");
+        return;
+    }
     try {
         const device = await navigator.bluetooth.requestDevice({
             filters: [
