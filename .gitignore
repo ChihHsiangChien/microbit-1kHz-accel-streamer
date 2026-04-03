@@ -1,0 +1,36 @@
+# CODAL / Build Artifacts
+build/
+*.hex
+*.bin
+*.map
+*.uf2
+pxtapp
+buildcache.json
+DEPFILE
+
+# Libraries (Managed as submodules)
+libraries/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# IDEs and System files
+.vscode/
+.DS_Store
+*.swp
+*~
+
+# Project Specific Unnecessary Files
+unused_temp/
+*.jpg
+*.tmp
+*.skill
+.gemini/
+
+# Legacy Yotta
+.yotta.json
+yotta_modules/
+yotta_targets/
+Makefile
