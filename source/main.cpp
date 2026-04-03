@@ -10,6 +10,7 @@ uint8_t sensor_addr = 0;
 bool is_qma = false;
 uint8_t scale_gs[] = {2, 4, 8, 16};
 int current_scale_idx = 2; 
+bool display_enabled = true; // Toggle flag for LED matrix
 
 void update_sensor_scale() {
     if (sensor_addr == 0x32) { // LSM303
@@ -20,16 +21,20 @@ void update_sensor_scale() {
         uint8_t range_val = (current_scale_idx == 0) ? 0x01 : (current_scale_idx == 1) ? 0x02 : (current_scale_idx == 2) ? 0x04 : 0x08;
         uint8_t range[] = {0x0F, range_val}; uBit._i2c.write(sensor_addr, range, 2);
     }
-    // 第一排顯示當前量程 (1-4個點)
-    for(int i=0; i<5; i++) uBit.display.image.setPixelValue(i, 0, (i <= current_scale_idx) ? 255 : 0);
+    
+    // Update range indicator (Top row)
+    if (display_enabled) {
+        for(int i=0; i<5; i++) uBit.display.image.setPixelValue(i, 0, (i <= current_scale_idx) ? 255 : 0);
+    } else {
+        uBit.display.clear();
+    }
 }
 
 int main() {
     uBit.init();
-    
     uBit._i2c.setFrequency(400000); 
 
-    // Scan for sensor
+    // Sensor scan
     uint8_t scan_reg = 0x00;
     if (uBit._i2c.write(0x32, &scan_reg, 1, true) == DEVICE_OK) sensor_addr = 0x32;
     else if (uBit._i2c.write(0x24, &scan_reg, 1, true) == DEVICE_OK) sensor_addr = 0x24;
@@ -57,18 +62,30 @@ int main() {
     int packed_samples = 0;
     int dot_x = 0;
     bool last_btn_a = false;
+    bool last_btn_b = false;
 
     while(1) {
         uint64_t start_loop = uBit.systemTime();
 
-        // 每 100ms 處理低速任務
+        // High-frequency task: every 100ms
         if (global_sample_index % 100 == 0) {
+            // Button A: Scale Toggle
             bool btn_a = uBit.buttonA.isPressed();
             if (btn_a && !last_btn_a) {
                 current_scale_idx = (current_scale_idx + 1) % 4;
                 update_sensor_scale();
             }
             last_btn_a = btn_a;
+
+            // Button B: Display Toggle
+            bool btn_b = uBit.buttonB.isPressed();
+            if (btn_b && !last_btn_b) {
+                display_enabled = !display_enabled;
+                if (!display_enabled) uBit.display.clear();
+                else update_sensor_scale();
+            }
+            last_btn_b = btn_b;
+
             fiber_sleep(1); 
         }
 
@@ -93,14 +110,14 @@ int main() {
             if (uBit.ble->getConnected()) uart->send(packet, 128, ASYNC);
             packed_samples = 0;
             
-            // 心跳
-            uBit.display.image.setPixelValue(dot_x, 4, 0);
-            dot_x = (dot_x + 1) % 5;
-            uBit.display.image.setPixelValue(dot_x, 4, 255);
+            // Heartbeat (Bottom row)
+            if (display_enabled) {
+                uBit.display.image.setPixelValue(dot_x, 4, 0);
+                dot_x = (dot_x + 1) % 5;
+                uBit.display.image.setPixelValue(dot_x, 4, 255);
+            }
         }
         global_sample_index++;
-
-        // 緊密計時
         while ((uBit.systemTime() - start_loop) < 1);
     }
 }
