@@ -24,7 +24,7 @@ cp MICROBIT.hex /media/pancala/MICROBIT/ && sync
 
 ### 2. 手機/電腦 Web App 使用
 1.  開啟瀏覽器（建議 Chrome 或 Edge）。
-2.  存取 [GitHub Pages 網址](https://ChihHsiangChien.github.io/VBT-Motion-Tracker-microbit/) 或本地 `http://127.0.0.1:8000`。
+2.  存取 [GitHub Pages 網址](https://ChihHsiangChien.github.io/microbit-1kHz-accel-streamer/) 或本地 `http://127.0.0.1:8000`。
 3.  點擊「連接 micro:bit」，搜尋以 `MB_` 開頭的裝置。
 4.  連線後即可看到實時三軸加速度圖表。
 
@@ -60,5 +60,7 @@ python3 -m venv venv
 | 124-127 | 4 | **全局樣本索引** (用於計算丟包率) |
 
 ## 技術細節
-*   **1kHz 積分**：Web App 物理運算時間步長為 `0.001s`，速度計算精度極高。
-*   **渲染機制**：VBT 界面採 60Hz 刷新，RAW 數據採原生 Canvas 隨數據流更新，最高支援每秒 50 次重繪而不產生阻塞。
+*   **1kHz 穩定採樣**：透過底層 I2C (400kHz) 與精準忙等計時，達成每秒 1000 次穩定採樣。
+*   **封裝發送策略**：硬體端並非每筆採樣都發送，而是累積 **20 筆採樣 (共 120 Bytes 數據)** 後，封裝成 128 Bytes 的大型封包一次發送。這大幅減少了 BLE 協定層的 Overhead，是達成 1kHz 串流的關鍵。
+*   **FastUARTService**：自定義的藍牙服務，內部實作了 **環狀緩衝區 (Circular Buffer)**，並使用 **ASYNC (非同步)** 模式發送，確保數據傳輸不會阻塞 1kHz 的感測器讀取主迴圈。
+*   **渲染機制**：Web App 端使用原生 Canvas API 隨數據流更新繪圖，最高支援每秒 50 次重繪 (對應每秒 50 個 128-byte 封包)，確保視覺流暢且不產生 UI 阻塞。
