@@ -52,7 +52,9 @@ int main() {
     update_sensor_scale();
 
     if(uBit.ble) {
-        uBit.bleManager.init(ManagedString("VBT_ULTRA"), ManagedString("1"), uBit.messageBus, uBit.storage, false);
+        ManagedString name = ManagedString("MB_") + ManagedString(microbit_friendly_name());
+        uBit.display.scroll(name);
+        uBit.bleManager.init(name, uBit.getSerial(), uBit.messageBus, uBit.storage, false);
         uBit.bleManager.advertise();
     }
     uart = new FastUARTService(*uBit.ble, 2048, 2048);

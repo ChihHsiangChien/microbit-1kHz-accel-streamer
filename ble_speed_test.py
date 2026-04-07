@@ -109,20 +109,22 @@ async def run_client():
     processor = DataProcessor()
     
     while True:
-        print("\n[Scanner] Searching for BBC micro:bit [VBT_ULTRA]...")
-        try:
-            device = await BleakScanner.find_device_by_filter(
-                lambda d, ad: d.name and "VBT" in d.name,
-                timeout=10.0
-            )
-            
-            if not device:
-                print("[Scanner] No device found. Retrying in 2s...")
-                await asyncio.sleep(2.0)
-                continue
+        print("\n[Scanner] Searching for BBC micro:bit [MB_XXXXX]...")
 
-            print(f"[Connect] Found {device.name} ({device.address}). Connecting...")
-            
+        # 使用過濾器找尋符合的裝置
+        device = await BleakScanner.find_device_by_filter(
+                lambda d, ad: d.name and "MB_" in d.name,
+                timeout=10.0
+        )
+
+        if not device:
+            print("[Scanner] No device found. Retrying in 2s...")
+            await asyncio.sleep(2.0)
+            continue
+
+        print(f"[Connect] Found {device.name} ({device.address}). Connecting...")
+        
+        try:
             async with BleakClient(device.address, timeout=15.0) as client:
                 print(f"[BLE] Connected! MTU: {client.mtu_size}")
                 processor.reset()
