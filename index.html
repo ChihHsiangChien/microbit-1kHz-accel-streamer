@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#007AFF">
 <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/color/192/000000/speed.png">
 <link rel="apple-touch-icon" href="https://img.icons8.com/color/192/000000/speed.png">
-<title>micro:bit VBT Pro v2.4.1</title>
+<title>micro:bit VBT Pro v2.5.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -34,8 +34,6 @@
   .btn-info { background: var(--info); color: white; }
   .btn-sm { padding: 5px 10px; font-size: 0.7rem; border-radius: 5px; }
 
-  .top-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-  
   .main-panel { background: var(--panel-bg); border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #EEE; margin-bottom: 15px; }
   .chart-container { background: #FFF; border-radius: 10px; border: 1px solid #EEE; overflow: hidden; position: relative; height: 320px; }
   
@@ -53,8 +51,12 @@
   #recordingStatus { color: var(--danger); font-weight: bold; display: none; margin-left: 10px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: 0; } }
 
-  .segment-list { margin-top: 15px; border-top: 1px dashed #CCC; padding-top: 10px; }
   .instruction { font-size: 0.75rem; color: #666; margin-bottom: 10px; line-height: 1.4; background: #FFFBE6; padding: 8px; border-radius: 8px; border: 1px solid #FFE58F; }
+  
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .summary-card { background: #f8f9fa; padding: 8px; border-radius: 8px; text-align: center; border: 1px solid #eee; }
+  .summary-label { font-size: 0.6rem; color: #888; display: block; }
+  .summary-val { font-size: 0.9rem; font-weight: bold; color: var(--primary); }
 </style>
 </head>
 <body>
@@ -66,12 +68,12 @@
   <div class="tabs">
     <div class="tab active" data-tab="streamer">即時串流</div>
     <div class="tab" data-tab="recorder">錄製與切分</div>
-    <div class="tab" data-tab="history">歷史分析</div>
+    <div class="tab" data-tab="history">趨勢分析</div>
   </div>
   
   <!-- Streamer Section -->
   <div id="streamer" class="content-section active">
-    <div class="top-bar">
+    <div class="top-bar" style="display:flex; gap:8px; margin-bottom:10px; padding:0 5px;">
       <button id="connectBtn" class="btn btn-primary" style="flex:1;">連接 micro:bit</button>
       <button id="calibrateBtn" class="btn btn-warning" style="flex:1;">重力校準</button>
     </div>
@@ -86,16 +88,16 @@
   <!-- Recorder Section -->
   <div id="recorder" class="content-section">
     <div class="instruction">
-        <b>💡 分析教學：</b><br>
-        1. 錄製一組動作後，圖表會顯示波形。<br>
-        2. <b>左右滑動圖表</b>找到要分析的「向上發力段」。<br>
-        3. <b>雙指縮放</b>將該段落填滿圖表視野。<br>
-        4. 點擊「分析目前範圍」，數據會自動永久存檔。
+        <b>💡 多次重複切分教學：</b><br>
+        1. 錄製包含「多下」動作的整組過程。<br>
+        2. 停止錄製後，在圖表上<b>縮放並平移</b>找到第一下，點擊分析。<br>
+        3. 重複上述步驟切分出第二下、第三下...<br>
+        4. 所有的切分都會在「趨勢分析」中繪製成曲線。
     </div>
     <div class="controls">
-        <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製</button>
+        <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製組數</button>
         <button id="stopRecBtn" class="btn btn-success" disabled>⏹ 停止錄製</button>
-        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析目前圖表範圍並存檔</button>
+        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析圖表當前動作 (切分 Rep)</button>
     </div>
     
     <div class="main-panel">
@@ -107,18 +109,21 @@
 
   <!-- History Section -->
   <div id="history" class="content-section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span style="font-weight:bold;">數據趨勢圖</span>
-        <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空所有紀錄</button>
+    <div class="summary-grid">
+        <div class="summary-card"><span class="summary-label">平均 Acc</span><span id="sumAvgAcc" class="summary-val">--</span></div>
+        <div class="summary-card"><span class="summary-label">平均 RFD</span><span id="sumAvgRFD" class="summary-val">--</span></div>
+        <div class="summary-card"><span class="summary-label">疲勞損耗</span><span id="sumFatigue" class="summary-val">--</span></div>
     </div>
     <div class="main-panel">
-        <div class="chart-container" style="height: 250px;">
+        <div class="chart-container" style="height: 280px;">
             <canvas id="historyChart"></canvas>
         </div>
     </div>
-    <div id="historyList" class="segment-list">
-        <!-- History items loaded from localStorage -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 10px 0;">
+        <span style="font-weight:bold;">歷史動作明細</span>
+        <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空所有紀錄</button>
     </div>
+    <div id="historyList"></div>
   </div>
 
   <div class="monitor-footer">
@@ -135,17 +140,13 @@ let gravityVec = { x: 0, y: 0, z: 1 }, gMag = 1.0;
 const historySize = 300, rawHistoryX = new Float32Array(historySize), rawHistoryY = new Float32Array(historySize), rawHistoryZ = new Float32Array(historySize);
 let dataIdx = 0, packetCount = 0, lastFpsTime = Date.now(), lastUIUpdateTime = 0;
 
-// --- 錄製與持久化數據 ---
 let isRecording = false, recordingData = [], segments = [];
 let recordChart = null, historyChart = null;
 
-// --- 初始化與載入歷史 ---
 function init() {
     loadSegments();
     initCharts();
     updateHistoryUI();
-    
-    // PWA Service Worker
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
       navigator.serviceWorker.register('./sw.js').catch(e => console.error(e));
     }
@@ -153,14 +154,10 @@ function init() {
 
 function loadSegments() {
     const saved = localStorage.getItem('vbt_pro_segments');
-    if (saved) {
-        try { segments = JSON.parse(saved); } catch(e) { segments = []; }
-    }
+    if (saved) { try { segments = JSON.parse(saved); } catch(e) { segments = []; } }
 }
 
-function saveSegments() {
-    localStorage.setItem('vbt_pro_segments', JSON.stringify(segments));
-}
+function saveSegments() { localStorage.setItem('vbt_pro_segments', JSON.stringify(segments)); }
 
 function initCharts() {
     const ctxRec = document.getElementById('recordChart').getContext('2d');
@@ -169,25 +166,23 @@ function initCharts() {
         data: { datasets: [{ label: '垂直 Acc (G)', data: [], borderColor: '#2196F3', borderWidth: 1.5, pointRadius: 0, fill: false }] },
         options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { x: { type: 'linear', title: { display: true, text: '秒' } }, y: { beginAtZero: false } },
-            plugins: {
-                zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }
-            }
+            scales: { x: { type: 'linear', title: { display: true, text: '秒' } } },
+            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } } }
         }
     });
 
     const ctxHist = document.getElementById('historyChart').getContext('2d');
     historyChart = new Chart(ctxHist, {
-        type: 'bar',
         data: { labels: [], datasets: [
-            { label: 'Peak Acc (G)', data: [], backgroundColor: '#2196F3', yAxisID: 'y' },
-            { label: 'Peak RFD (G/s)', data: [], backgroundColor: '#E91E63', yAxisID: 'y1' }
+            { type: 'bar', label: 'Peak Acc (G)', data: [], backgroundColor: 'rgba(33, 150, 243, 0.6)', yAxisID: 'y' },
+            { type: 'line', label: 'Acc 趨勢', data: [], borderColor: '#2196F3', borderWidth: 2, tension: 0.3, pointRadius: 4, fill: false, yAxisID: 'y' },
+            { type: 'line', label: 'Peak RFD (G/s)', data: [], borderColor: '#E91E63', borderWidth: 2, tension: 0.3, pointRadius: 4, fill: false, yAxisID: 'y1' }
         ]},
         options: {
             responsive: true, maintainAspectRatio: false,
             scales: {
-                y: { type: 'linear', position: 'left', title: { display: true, text: 'G' } },
-                y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'G/s' } }
+                y: { type: 'linear', position: 'left', title: { display: true, text: 'Acc (G)' } },
+                y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'RFD (G/s)' } }
             }
         }
     });
@@ -226,7 +221,6 @@ function processData(x, y, z) {
     dataIdx = (dataIdx + 1) % historySize;
 }
 
-// --- 錄製與分析 ---
 document.getElementById('startRecBtn').addEventListener('click', () => {
     recordingData = []; isRecording = true;
     document.getElementById('recordingStatus').style.display = 'inline';
@@ -257,72 +251,51 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
         if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
     }
 
-    const note = prompt("請輸入動作備註", `Rep ${segments.length + 1}`);
+    const note = prompt("請輸入動作備註 (Rep)", `Rep ${segments.length + 1}`);
     if (note === null) return;
 
-    const segment = { 
-        id: Date.now(),
-        date: new Date().toLocaleString(),
-        note, 
-        peakAcc, 
-        peakRFD, 
-        timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` 
-    };
-    segments.push(segment);
-    saveSegments();
-    updateHistoryUI();
-    alert("數據已自動存檔");
+    const segment = { id: Date.now(), date: new Date().toLocaleString(), note, peakAcc, peakRFD, timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` };
+    segments.push(segment); saveSegments(); updateHistoryUI();
 });
 
 function updateHistoryUI() {
     const list = document.getElementById('historyList');
-    list.innerHTML = "<strong>歷史紀錄：</strong>" + segments.slice().reverse().map((s, i) => `
+    list.innerHTML = segments.slice().reverse().map((s) => `
         <div class="history-item">
-            <div class="history-info">
-                <span class="history-date">${s.date}</span>
-                <span class="history-note">${s.note}</span>
-                <span style="font-size:0.6rem; color:#999;">區間: ${s.timeRange}</span>
-            </div>
-            <div style="text-align:right;">
-                <div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div>
-                <button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button>
-            </div>
-        </div>
-    `).join('');
+            <div class="history-info"><span class="history-date">${s.date}</span><span class="history-note">${s.note}</span><span style="font-size:0.6rem; color:#999;">${s.timeRange}</span></div>
+            <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div><button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button></div>
+        </div>`).join('');
+
+    // 計算統計
+    if (segments.length > 0) {
+        const avgAcc = segments.reduce((a, b) => a + b.peakAcc, 0) / segments.length;
+        const avgRFD = segments.reduce((a, b) => a + b.peakRFD, 0) / segments.length;
+        const fatigue = segments.length > 1 ? ((segments[0].peakAcc - segments[segments.length-1].peakAcc) / segments[0].peakAcc * 100) : 0;
+        document.getElementById('sumAvgAcc').innerText = avgAcc.toFixed(2) + " G";
+        document.getElementById('sumAvgRFD').innerText = avgRFD.toFixed(0);
+        document.getElementById('sumFatigue').innerText = fatigue.toFixed(1) + "%";
+    }
 
     historyChart.data.labels = segments.map(s => s.note);
     historyChart.data.datasets[0].data = segments.map(s => s.peakAcc);
-    historyChart.data.datasets[1].data = segments.map(s => s.peakRFD);
+    historyChart.data.datasets[1].data = segments.map(s => s.peakAcc); // Line Trend
+    historyChart.data.datasets[2].data = segments.map(s => s.peakRFD);
     historyChart.update();
 }
 
-window.deleteSegment = function(id) {
-    if(!confirm("確定刪除此紀錄？")) return;
-    segments = segments.filter(s => s.id !== id);
-    saveSegments();
-    updateHistoryUI();
-};
+window.deleteSegment = function(id) { if(confirm("刪除？")){ segments = segments.filter(s => s.id !== id); saveSegments(); updateHistoryUI(); } };
+document.getElementById('clearHistoryBtn').addEventListener('click', () => { if(confirm("清空歷史？")){ segments = []; saveSegments(); updateHistoryUI(); } });
 
-document.getElementById('clearHistoryBtn').addEventListener('click', () => {
-    if(!confirm("確定清空所有歷史紀錄？這將無法復原。")) return;
-    segments = [];
-    saveSegments();
-    updateHistoryUI();
-});
-
-// --- Tab & BT ---
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab, .content-section').forEach(el => el.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(tab.dataset.tab).classList.add('active');
+    tab.classList.add('active'); document.getElementById(tab.dataset.tab).classList.add('active');
   });
 });
 
 document.getElementById('calibrateBtn').addEventListener('click', () => {
     let avgX=0, avgY=0, avgZ=0; for(let i=0; i<50; i++){ const idx=(dataIdx-i+historySize)%historySize; avgX+=rawHistoryX[idx]; avgY+=rawHistoryY[idx]; avgZ+=rawHistoryZ[idx]; }
-    avgX/=50; avgY/=50; avgZ/=50; gMag = Math.sqrt(avgX**2+avgY**2+avgZ**2); gravityVec = { x:avgX/gMag, y:avgY/gMag, z:avgZ/gMag };
-    alert(`校準完成！`);
+    avgX/=50; avgY/=50; avgZ/=50; gMag = Math.sqrt(avgX**2+avgY**2+avgZ**2); gravityVec = { x:avgX/gMag, y:avgY/gMag, z:avgZ/gMag }; alert("校準完成");
 });
 
 document.getElementById('connectBtn').addEventListener('click', async () => {
