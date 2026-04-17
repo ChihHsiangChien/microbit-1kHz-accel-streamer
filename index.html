@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 
-<title>micro:bit VBT Pro v2.6.1</title>
+<title>micro:bit VBT Pro v2.7.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -30,8 +30,9 @@
   .content-section { display: none; padding: 10px; }
   .content-section.active { display: block; }
 
-  .btn { border: none; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; }
+  .btn { border: none; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px; }
   .btn:active { opacity: 0.7; }
+  .btn:disabled { background: #CCC !important; cursor: not-allowed; }
   .btn-primary { background: var(--primary); color: white; }
   .btn-success { background: var(--success); color: white; }
   .btn-warning { background: var(--warning); color: white; }
@@ -45,67 +46,81 @@
   .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
   .full-width { grid-column: span 2; }
 
-  .history-item { background: #FFF; padding: 12px; border-radius: 10px; border: 1px solid #EEE; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--primary); position: relative; }
+  .config-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; background: #EEE; padding: 8px 12px; border-radius: 10px; }
+  .config-row label { font-size: 0.8rem; font-weight: bold; color: #666; flex: 1; }
+  .config-row input { width: 60px; border: none; padding: 5px; border-radius: 5px; text-align: center; font-weight: bold; }
+
+  .timer-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
+  .timer-big { font-size: 8rem; font-weight: 900; margin-bottom: 20px; }
+  .timer-label { font-size: 1.5rem; font-weight: bold; }
+
+  .history-item { background: #FFF; padding: 12px; border-radius: 10px; border: 1px solid #EEE; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--primary); }
   .history-info { display: flex; flex-direction: column; flex: 1; }
-  .history-date { font-size: 0.6rem; color: #AAA; }
-  .history-note { font-weight: bold; font-size: 0.95rem; margin: 2px 0; color: var(--primary); text-decoration: underline; cursor: pointer; }
-  .history-vals { font-size: 0.9rem; color: var(--text-dark); font-weight: 900; }
+  .history-note { font-weight: bold; font-size: 0.95rem; color: var(--primary); text-decoration: underline; cursor: pointer; }
+  .history-vals { font-size: 0.9rem; font-weight: 900; }
 
   .monitor-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #FFF; border-top: 1px solid #EEE; padding: 5px 15px; font-family: monospace; font-size: 0.65rem; color: #333; display: flex; justify-content: space-between; align-items: center; z-index: 100; height: 30px; }
   
-  #recordingStatus { color: var(--danger); font-weight: bold; display: none; margin-left: 10px; animation: blink 1s infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-
   .instruction { font-size: 0.75rem; color: #666; margin-bottom: 10px; line-height: 1.4; background: #FFFBE6; padding: 8px; border-radius: 8px; border: 1px solid #FFE58F; }
   
   .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
   .summary-card { background: #f8f9fa; padding: 8px; border-radius: 8px; text-align: center; border: 1px solid #eee; }
   .summary-label { font-size: 0.6rem; color: #888; display: block; }
   .summary-val { font-size: 0.9rem; font-weight: bold; color: var(--primary); }
-
-  .section-title { font-size: 0.85rem; font-weight: 900; margin: 15px 0 10px 5px; color: #555; display: flex; align-items: center; gap: 5px; }
-  .dot-rec { width: 8px; height: 8px; background: var(--danger); border-radius: 50%; }
 </style>
 </head>
 <body>
+  <!-- Timer Overlay -->
+  <div id="timerOverlay" class="timer-overlay">
+    <div id="timerLabel" class="timer-label">準備中</div>
+    <div id="timerBig" class="timer-big">3</div>
+    <button id="cancelRecBtn" class="btn btn-danger">取消</button>
+  </div>
+
   <div class="header">
     <span class="title">ACCEL VBT PRO</span>
-    <div><span id="recordingStatus">● REC</span> <span id="status" style="font-size:0.7rem; color:#999;">尚未連線</span></div>
+    <div><span id="status" style="font-size:0.7rem; color:#999;">尚未連線</span></div>
   </div>
 
   <div class="tabs">
     <div class="tab active" data-tab="streamer">即時串流</div>
-    <div class="tab" data-tab="recorder">錄製與切分</div>
+    <div class="tab" data-tab="recorder">定時錄製</div>
     <div class="tab" data-tab="history">趨勢分析</div>
   </div>
   
   <!-- Tab 1: Streamer -->
   <div id="streamer" class="content-section active">
-    <div class="top-bar" style="display:flex; gap:8px; margin-bottom:10px; padding:0 5px;">
+    <div class="top-bar" style="display:flex; gap:8px; margin-bottom:10px;">
       <button id="connectBtn" class="btn btn-primary" style="flex:1;">連接 micro:bit</button>
       <button id="calibrateBtn" class="btn btn-warning" style="flex:1;">重力校準</button>
     </div>
     <div class="main-panel">
       <div class="chart-container" style="height: 250px;"><canvas id="rawCanvas"></canvas></div>
-      <div style="font-size: 0.7rem; text-align:center; margin-top:5px; color:#999;">XYZ 三軸原始數據 (1kHz)</div>
     </div>
   </div>
 
   <!-- Tab 2: Recorder -->
   <div id="recorder" class="content-section">
-    <div class="instruction">
-        <b>🚀 效能優化 (v2.6.1)：</b><br>
-        圖表以 100Hz 顯示以確保操作流暢，但<b>分析時會使用 1000Hz 原始數據</b>以確保 RFD 計算精確。
+    <div class="main-panel" style="padding: 15px;">
+        <div class="config-row">
+            <label>延遲開始 (準備時間)</label>
+            <input type="number" id="cfgDelay" value="3" min="0">秒
+        </div>
+        <div class="config-row">
+            <label>錄製時長 (自動停止)</label>
+            <input type="number" id="cfgDuration" value="15" min="5" max="60">秒
+        </div>
+        <button id="startAutoRecBtn" class="btn btn-danger full-width" style="margin-top:5px; height:50px;">🚀 開始定時錄製</button>
     </div>
+
     <div class="controls">
-        <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製</button>
-        <button id="stopRecBtn" class="btn btn-success" disabled>⏹ 停止錄製</button>
-        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析目前範圍 (1000Hz 精確計算)</button>
+        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析圖表當前範圍 (1000Hz)</button>
     </div>
+
     <div class="main-panel">
         <div class="chart-container"><canvas id="recordChart"></canvas></div>
     </div>
-    <div class="section-title"><div class="dot-rec"></div>本次錄製清單</div>
+    
     <div id="currentSessionList"></div>
   </div>
 
@@ -119,9 +134,9 @@
     <div class="main-panel">
         <div class="chart-container" style="height: 280px;"><canvas id="historyChart"></canvas></div>
     </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin: 15px 5px 10px 5px;">
-        <span style="font-weight:bold; font-size:0.85rem;">歷史動作管理</span>
-        <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空歷史</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 10px 0;">
+        <span style="font-weight:bold; font-size:0.85rem;">歷史記錄</span>
+        <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空</button>
     </div>
     <div id="historyList"></div>
   </div>
@@ -130,7 +145,7 @@
     <div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div>
     <div style="display:flex; gap:10px;">
         <span id="fpsDisplay">0 Hz</span>
-        <span style="color:#AAA; font-weight:bold;">v2.6.1</span>
+        <span style="color:#AAA; font-weight:bold;">v2.7.0</span>
     </div>
   </div>
 
@@ -147,11 +162,9 @@ let isRecording = false, recordingData = [], segments = [], sessionStartTime = 0
 let recordChart = null, historyChart = null;
 
 function init() {
-    loadSegments();
-    initCharts();
-    updateHistoryUI();
+    loadSegments(); initCharts(); updateHistoryUI();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-      navigator.serviceWorker.register('./sw.js').catch(e => console.error("SW failed:", e));
+      navigator.serviceWorker.register('./sw.js').catch(e => console.error(e));
     }
 }
 
@@ -171,8 +184,7 @@ function initCharts() {
         type: 'line',
         data: { datasets: [{ label: '垂直 Acc (G)', data: [], borderColor: '#2196F3', borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true }] },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            animation: false, // 關閉動畫提升效能
+            responsive: true, maintainAspectRatio: false, animation: false,
             scales: { x: { type: 'linear', title: { display: true, text: '秒' } } },
             plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } } }
         }
@@ -228,61 +240,95 @@ function processData(x, y, z) {
     dataIdx = (dataIdx + 1) % historySize;
 }
 
-// --- 錄製控制器 ---
-document.getElementById('startRecBtn').addEventListener('click', () => {
-    recordingData = []; isRecording = true; sessionStartTime = Date.now();
-    document.getElementById('recordingStatus').style.display = 'inline';
-    document.getElementById('startRecBtn').disabled = true; document.getElementById('stopRecBtn').disabled = false;
-    document.getElementById('analyzeRangeBtn').disabled = true;
-    document.getElementById('currentSessionList').innerHTML = "";
+// --- 定時錄製邏輯 ---
+let autoRecTimer = null;
+document.getElementById('startAutoRecBtn').addEventListener('click', () => {
+    if (!bleDevice || !bleDevice.gatt.connected) return alert("請先連接 micro:bit");
+    
+    const delay = parseInt(document.getElementById('cfgDelay').value) || 0;
+    const duration = parseInt(document.getElementById('cfgDuration').value) || 15;
+    
+    const overlay = document.getElementById('timerOverlay');
+    const label = document.getElementById('timerLabel');
+    const big = document.getElementById('timerBig');
+    overlay.style.display = 'flex';
+
+    let count = delay;
+    if (delay > 0) {
+        label.innerText = "準備中";
+        big.innerText = count;
+        autoRecTimer = setInterval(() => {
+            count--;
+            if (count > 0) {
+                big.innerText = count;
+            } else {
+                clearInterval(autoRecTimer);
+                startActualRecording(duration);
+            }
+        }, 1000);
+    } else {
+        startActualRecording(duration);
+    }
 });
 
-document.getElementById('stopRecBtn').addEventListener('click', () => {
-    isRecording = false; document.getElementById('recordingStatus').style.display = 'none';
-    document.getElementById('startRecBtn').disabled = false; document.getElementById('stopRecBtn').disabled = true;
+function startActualRecording(duration) {
+    const label = document.getElementById('timerLabel');
+    const big = document.getElementById('timerBig');
+    label.innerText = "錄製中 (自動停止剩餘)";
+    
+    recordingData = []; isRecording = true; sessionStartTime = Date.now();
+    let timeLeft = duration;
+    big.innerText = timeLeft;
+
+    autoRecTimer = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0) {
+            big.innerText = timeLeft;
+        } else {
+            stopActualRecording();
+        }
+    }, 1000);
+}
+
+function stopActualRecording() {
+    clearInterval(autoRecTimer);
+    isRecording = false;
+    document.getElementById('timerOverlay').style.display = 'none';
     document.getElementById('analyzeRangeBtn').disabled = false;
     
-    // 【效能優化】繪圖時進行 10 倍降維 (1000Hz -> 100Hz)
     const displayData = [];
-    for(let i=0; i<recordingData.length; i+=10) {
-        displayData.push(recordingData[i]);
-    }
+    for(let i=0; i<recordingData.length; i+=10) displayData.push(recordingData[i]);
     recordChart.data.datasets[0].data = displayData;
-    recordChart.resetZoom(); 
-    recordChart.update('none'); // 無動畫更新
+    recordChart.resetZoom(); recordChart.update('none');
+}
+
+document.getElementById('cancelRecBtn').addEventListener('click', () => {
+    clearInterval(autoRecTimer);
+    isRecording = false;
+    document.getElementById('timerOverlay').style.display = 'none';
 });
 
+// --- 分析與 UI ---
 document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     const scaleX = recordChart.scales.x;
     const minT = scaleX.min, maxT = scaleX.max;
-    
-    // 【準確性優化】分析時使用 1000Hz 原始數據
     const visibleData = recordingData.filter(d => d.x >= minT && d.x <= maxT);
     if (visibleData.length < 10) return alert("範圍太小");
 
-    let peakAcc = 0; 
-    visibleData.forEach(d => { if(d.y > peakAcc) peakAcc = d.y; });
-    
+    let peakAcc = 0; visibleData.forEach(d => { if(d.y > peakAcc) peakAcc = d.y; });
     let peakRFD = 0; const dt = 0.001;
-    // 尋找原始數據中的索引進行高頻斜率計算
     const startIdx = Math.max(2, recordingData.findIndex(d => d.x >= minT));
     const endIdx = Math.min(recordingData.length - 3, recordingData.findIndex(d => d.x >= maxT));
-
     if (startIdx !== -1 && endIdx !== -1) {
         for (let i = startIdx; i <= endIdx; i++) {
             const rfd = (2 * recordingData[i+2].y + recordingData[i+1].y - recordingData[i-1].y - 2 * recordingData[i-2].y) / (10 * dt);
             if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
         }
     }
-
     const defaultNote = `Rep ${segments.length + 1}`;
     const note = prompt("輸入備註:", defaultNote) || defaultNote;
     const segment = { id: Date.now(), absStartTime: sessionStartTime + (minT * 1000), date: new Date(sessionStartTime + (minT * 1000)).toLocaleString(), note, peakAcc, peakRFD, timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` };
-    
-    segments.push(segment);
-    saveSegments();
-    updateHistoryUI();
-    renderCurrentSession(sessionStartTime);
+    segments.push(segment); saveSegments(); updateHistoryUI(); renderCurrentSession(sessionStartTime);
 });
 
 function renderCurrentSession(startTime) {
@@ -297,13 +343,11 @@ function renderCurrentSession(startTime) {
 
 function updateHistoryUI() {
     const sortedSegments = [...segments].sort((a, b) => b.absStartTime - a.absStartTime);
-    const list = document.getElementById('historyList');
-    list.innerHTML = sortedSegments.map(s => `
+    document.getElementById('historyList').innerHTML = sortedSegments.map(s => `
         <div class="history-item">
             <div class="history-info"><span class="history-date">${s.date}</span><span class="history-note" onclick="editNote(${s.id})">${s.note}</span><span style="font-size:0.6rem; color:#999;">${s.timeRange}</span></div>
             <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div><button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button></div>
         </div>`).join('');
-
     const chronoSorted = [...segments].sort((a, b) => a.absStartTime - b.absStartTime);
     if (chronoSorted.length > 0) {
         const avgAcc = chronoSorted.reduce((a, b) => a + b.peakAcc, 0) / chronoSorted.length;
@@ -313,7 +357,6 @@ function updateHistoryUI() {
         document.getElementById('sumAvgRFD').innerText = avgRFD.toFixed(0);
         document.getElementById('sumFatigue').innerText = fatigue.toFixed(1) + "%";
     }
-
     historyChart.data.labels = chronoSorted.map(s => s.note);
     historyChart.data.datasets[0].data = chronoSorted.map(s => s.peakAcc);
     historyChart.data.datasets[1].data = chronoSorted.map(s => s.peakAcc);
@@ -322,17 +365,14 @@ function updateHistoryUI() {
 }
 
 window.editNote = function(id) {
-    const s = segments.find(x => x.id === id);
-    if (!s) return;
+    const s = segments.find(x => x.id === id); if (!s) return;
     const newNote = prompt("修改備註:", s.note);
-    if (newNote !== null) { s.note = newNote; saveSegments(); updateHistoryUI(); if(isRecording || recordingData.length > 0) renderCurrentSession(sessionStartTime); }
+    if (newNote !== null) { s.note = newNote; saveSegments(); updateHistoryUI(); renderCurrentSession(sessionStartTime); }
 };
 
 window.deleteSegment = function(id, isCurrentSession = false) {
     if(!confirm("確定刪除此 Rep？")) return;
-    segments = segments.filter(s => s.id !== id);
-    saveSegments();
-    updateHistoryUI();
+    segments = segments.filter(s => s.id !== id); saveSegments(); updateHistoryUI();
     if(isCurrentSession) renderCurrentSession(sessionStartTime);
 };
 
@@ -341,7 +381,7 @@ document.getElementById('clearHistoryBtn').addEventListener('click', () => {
     segments = []; saveSegments(); updateHistoryUI(); document.getElementById('currentSessionList').innerHTML = "";
 });
 
-// --- UI & BT ---
+// --- Tab & BT ---
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab, .content-section').forEach(el => el.classList.remove('active'));
@@ -369,9 +409,7 @@ document.getElementById('connectBtn').addEventListener('click', async () => {
             while (rxBuffer.length >= 128) {
                 let packet = rxBuffer.slice(0, 128); rxBuffer = rxBuffer.slice(128);
                 let view = new DataView(packet.buffer); currentScale = packet[120] || 8;
-                for (let i = 0; i < 120; i += 6) {
-                    processData((view.getInt16(i,false)/32768.0)*currentScale, (view.getInt16(i+2,false)/32768.0)*currentScale, (view.getInt16(i+4,false)/32768.0)*currentScale);
-                }
+                for (let i = 0; i < 120; i += 6) { processData((view.getInt16(i,false)/32768.0)*currentScale, (view.getInt16(i+2,false)/32768.0)*currentScale, (view.getInt16(i+4,false)/32768.0)*currentScale); }
             }
         });
     } catch (err) { alert(err); }
