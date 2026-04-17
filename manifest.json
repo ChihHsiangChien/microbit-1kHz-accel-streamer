@@ -1,0 +1,21 @@
+{
+  "name": "micro:bit Accel Streamer",
+  "short_name": "AccelStream",
+  "description": "High-speed 1kHz Accelerometer Streamer for micro:bit",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F5F5F5",
+  "theme_color": "#007AFF",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/speed/mw600/24dp/1x/baseline_speed_black_24dp.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/action/speed/mw600/24dp/2x/baseline_speed_black_24dp.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
