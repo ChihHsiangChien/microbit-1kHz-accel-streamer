@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007AFF">
-<title>micro:bit VBT Pro v2.4.0</title>
+<link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/color/192/000000/speed.png">
+<link rel="apple-touch-icon" href="https://img.icons8.com/color/192/000000/speed.png">
+<title>micro:bit VBT Pro v2.4.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -142,6 +144,11 @@ function init() {
     loadSegments();
     initCharts();
     updateHistoryUI();
+    
+    // PWA Service Worker
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      navigator.serviceWorker.register('./sw.js').catch(e => console.error(e));
+    }
 }
 
 function loadSegments() {
