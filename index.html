@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 
-<title>micro:bit VBT Pro v2.6.0</title>
+<title>micro:bit VBT Pro v2.6.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -94,20 +94,17 @@
   <!-- Tab 2: Recorder -->
   <div id="recorder" class="content-section">
     <div class="instruction">
-        <b>💡 錄製切分管理：</b><br>
-        1. 停止錄製後，縮放圖表並分析每個 Rep。<br>
-        2. 下方會列出「本次錄製」的所有 Rep。<br>
-        3. 您可以立即<b>修改備註</b>或<b>刪除切錯的 Rep</b>。
+        <b>🚀 效能優化 (v2.6.1)：</b><br>
+        圖表以 100Hz 顯示以確保操作流暢，但<b>分析時會使用 1000Hz 原始數據</b>以確保 RFD 計算精確。
     </div>
     <div class="controls">
         <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製</button>
         <button id="stopRecBtn" class="btn btn-success" disabled>⏹ 停止錄製</button>
-        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析當前範圍並加入清單</button>
+        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析目前範圍 (1000Hz 精確計算)</button>
     </div>
     <div class="main-panel">
         <div class="chart-container"><canvas id="recordChart"></canvas></div>
     </div>
-    
     <div class="section-title"><div class="dot-rec"></div>本次錄製清單</div>
     <div id="currentSessionList"></div>
   </div>
@@ -133,7 +130,7 @@
     <div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div>
     <div style="display:flex; gap:10px;">
         <span id="fpsDisplay">0 Hz</span>
-        <span style="color:#AAA; font-weight:bold;">v2.6.0</span>
+        <span style="color:#AAA; font-weight:bold;">v2.6.1</span>
     </div>
   </div>
 
@@ -153,7 +150,6 @@ function init() {
     loadSegments();
     initCharts();
     updateHistoryUI();
-    // PWA Service Worker (only in secure context)
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
       navigator.serviceWorker.register('./sw.js').catch(e => console.error("SW failed:", e));
     }
@@ -173,9 +169,10 @@ function initCharts() {
     const ctxRec = document.getElementById('recordChart').getContext('2d');
     recordChart = new Chart(ctxRec, {
         type: 'line',
-        data: { datasets: [{ label: '垂直 Acc (G)', data: [], borderColor: '#2196F3', borderWidth: 1.5, pointRadius: 0, fill: false }] },
+        data: { datasets: [{ label: '垂直 Acc (G)', data: [], borderColor: '#2196F3', borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true }] },
         options: {
             responsive: true, maintainAspectRatio: false,
+            animation: false, // 關閉動畫提升效能
             scales: { x: { type: 'linear', title: { display: true, text: '秒' } } },
             plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } } }
         }
@@ -237,30 +234,45 @@ document.getElementById('startRecBtn').addEventListener('click', () => {
     document.getElementById('recordingStatus').style.display = 'inline';
     document.getElementById('startRecBtn').disabled = true; document.getElementById('stopRecBtn').disabled = false;
     document.getElementById('analyzeRangeBtn').disabled = true;
-    document.getElementById('currentSessionList').innerHTML = ""; // 清空本次清單
+    document.getElementById('currentSessionList').innerHTML = "";
 });
 
 document.getElementById('stopRecBtn').addEventListener('click', () => {
     isRecording = false; document.getElementById('recordingStatus').style.display = 'none';
     document.getElementById('startRecBtn').disabled = false; document.getElementById('stopRecBtn').disabled = true;
     document.getElementById('analyzeRangeBtn').disabled = false;
-    recordChart.data.datasets[0].data = recordingData;
-    recordChart.resetZoom(); recordChart.update();
+    
+    // 【效能優化】繪圖時進行 10 倍降維 (1000Hz -> 100Hz)
+    const displayData = [];
+    for(let i=0; i<recordingData.length; i+=10) {
+        displayData.push(recordingData[i]);
+    }
+    recordChart.data.datasets[0].data = displayData;
+    recordChart.resetZoom(); 
+    recordChart.update('none'); // 無動畫更新
 });
 
 document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     const scaleX = recordChart.scales.x;
     const minT = scaleX.min, maxT = scaleX.max;
+    
+    // 【準確性優化】分析時使用 1000Hz 原始數據
     const visibleData = recordingData.filter(d => d.x >= minT && d.x <= maxT);
     if (visibleData.length < 10) return alert("範圍太小");
 
-    let peakAcc = 0; visibleData.forEach(d => { if(d.y > peakAcc) peakAcc = d.y; });
+    let peakAcc = 0; 
+    visibleData.forEach(d => { if(d.y > peakAcc) peakAcc = d.y; });
+    
     let peakRFD = 0; const dt = 0.001;
-    const startIdx = recordingData.indexOf(visibleData[0]);
-    const endIdx = recordingData.indexOf(visibleData[visibleData.length - 1]);
-    for (let i = startIdx + 2; i <= endIdx - 2; i++) {
-        const rfd = (2 * recordingData[i+2].y + recordingData[i+1].y - recordingData[i-1].y - 2 * recordingData[i-2].y) / (10 * dt);
-        if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
+    // 尋找原始數據中的索引進行高頻斜率計算
+    const startIdx = Math.max(2, recordingData.findIndex(d => d.x >= minT));
+    const endIdx = Math.min(recordingData.length - 3, recordingData.findIndex(d => d.x >= maxT));
+
+    if (startIdx !== -1 && endIdx !== -1) {
+        for (let i = startIdx; i <= endIdx; i++) {
+            const rfd = (2 * recordingData[i+2].y + recordingData[i+1].y - recordingData[i-1].y - 2 * recordingData[i-2].y) / (10 * dt);
+            if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
+        }
     }
 
     const defaultNote = `Rep ${segments.length + 1}`;
@@ -273,7 +285,6 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     renderCurrentSession(sessionStartTime);
 });
 
-// 渲染「本次錄製」的清單
 function renderCurrentSession(startTime) {
     const sessionReps = segments.filter(s => s.absStartTime >= startTime);
     const list = document.getElementById('currentSessionList');
