@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#007AFF">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>micro:bit VBT Pro v2.5.2</title>
+<title>micro:bit VBT Pro v2.5.3</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -43,8 +43,8 @@
   .history-item { background: #FFF; padding: 12px; border-radius: 10px; border: 1px solid #EEE; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--primary); position: relative; }
   .history-info { display: flex; flex-direction: column; flex: 1; }
   .history-date { font-size: 0.6rem; color: #AAA; }
-  .history-note { font-weight: bold; font-size: 0.9rem; margin: 2px 0; }
-  .history-vals { font-size: 0.85rem; color: var(--primary); font-weight: 900; }
+  .history-note { font-weight: bold; font-size: 0.9rem; margin: 2px 0; color: var(--primary); text-decoration: underline; cursor: pointer; }
+  .history-vals { font-size: 0.85rem; color: var(--text-dark); font-weight: 900; }
 
   .monitor-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #FFF; border-top: 1px solid #EEE; padding: 5px 15px; font-family: monospace; font-size: 0.65rem; color: #333; display: flex; justify-content: space-between; align-items: center; z-index: 100; height: 30px; }
   
@@ -77,21 +77,22 @@
       <button id="calibrateBtn" class="btn btn-warning" style="flex:1;">重力校準</button>
     </div>
     <div class="main-panel">
-      <div class="chart-container" style="height: 250px;">
-          <canvas id="rawCanvas"></canvas>
-      </div>
+      <div class="chart-container" style="height: 250px;"><canvas id="rawCanvas"></canvas></div>
+      <div style="font-size: 0.7rem; text-align:center; margin-top:5px; color:#999;">XYZ 三軸原始數據 (1kHz)</div>
     </div>
   </div>
 
   <div id="recorder" class="content-section">
     <div class="instruction">
-        <b>💡 自動排序說明：</b><br>
-        系統會自動根據動作發生的先後進行排列。即使您先分析後面的 Rep，圖表也會正確繪製。
+        <b>💡 儲存與備註：</b><br>
+        1. 停止錄製後，在波形圖縮放找到特定 Rep。<br>
+        2. 點擊藍色按鈕進行分析，隨後會跳出<b>備註輸入框</b>。<br>
+        3. 所有數據會自動儲存至本機，下次開啟即可查看。
     </div>
     <div class="controls">
         <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製組數</button>
         <button id="stopRecBtn" class="btn btn-success" disabled>⏹ 停止錄製</button>
-        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析圖表當前動作 (切分 Rep)</button>
+        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析並寫入備註 (儲存 Rep)</button>
     </div>
     <div class="main-panel">
         <div class="chart-container"><canvas id="recordChart"></canvas></div>
@@ -108,7 +109,7 @@
         <div class="chart-container" style="height: 280px;"><canvas id="historyChart"></canvas></div>
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin: 10px 0;">
-        <span style="font-weight:bold;">歷史動作 (按時間排序)</span>
+        <span style="font-weight:bold;">歷史動作 (點擊備註可修改)</span>
         <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空歷史</button>
     </div>
     <div id="historyList"></div>
@@ -116,10 +117,14 @@
 
   <div class="monitor-footer">
     <div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div>
-    <div id="fpsDisplay">0 Hz</div>
+    <div style="display:flex; gap:10px;">
+        <span id="fpsDisplay">0 Hz</span>
+        <span style="color:#CCC;">v2.5.3</span>
+    </div>
   </div>
 
 <script>
+// --- 全域變數 ---
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 let bleDevice = null, rxBuffer = new Uint8Array(0), currentScale = 8;
@@ -241,8 +246,8 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
         if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
     }
 
-    const note = prompt("備註 (Rep)", `Rep ${segments.length + 1}`);
-    if (note === null) return;
+    const defaultNote = `Rep ${segments.length + 1}`;
+    const note = prompt("請輸入動作備註 (例如: 100kg 第一下)", defaultNote) || defaultNote;
 
     const segment = { 
         id: Date.now(), 
@@ -258,8 +263,15 @@ function updateHistoryUI() {
     const list = document.getElementById('historyList');
     list.innerHTML = sortedSegments.map((s) => `
         <div class="history-item">
-            <div class="history-info"><span class="history-date">${s.date}</span><span class="history-note">${s.note}</span><span style="font-size:0.6rem; color:#999;">${s.timeRange}</span></div>
-            <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div><button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button></div>
+            <div class="history-info">
+                <span class="history-date">${s.date}</span>
+                <span class="history-note" onclick="editNote(${s.id})">${s.note}</span>
+                <span style="font-size:0.6rem; color:#999;">${s.timeRange}</span>
+            </div>
+            <div style="text-align:right;">
+                <div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div>
+                <button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button>
+            </div>
         </div>`).join('');
 
     const chronoSorted = [...segments].sort((a, b) => a.absStartTime - b.absStartTime);
@@ -279,8 +291,19 @@ function updateHistoryUI() {
     historyChart.update();
 }
 
-window.deleteSegment = function(id) { if(confirm("刪除？")){ segments = segments.filter(s => s.id !== id); saveSegments(); updateHistoryUI(); } };
-document.getElementById('clearHistoryBtn').addEventListener('click', () => { if(confirm("清空歷史？")){ segments = []; saveSegments(); updateHistoryUI(); } });
+window.editNote = function(id) {
+    const s = segments.find(x => x.id === id);
+    if (!s) return;
+    const newNote = prompt("修改備註:", s.note);
+    if (newNote !== null) {
+        s.note = newNote;
+        saveSegments();
+        updateHistoryUI();
+    }
+};
+
+window.deleteSegment = function(id) { if(confirm("確定刪除此 Rep？")){ segments = segments.filter(s => s.id !== id); saveSegments(); updateHistoryUI(); } };
+document.getElementById('clearHistoryBtn').addEventListener('click', () => { if(confirm("確定清空所有歷史紀錄？")){ segments = []; saveSegments(); updateHistoryUI(); } });
 
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -291,7 +314,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 document.getElementById('calibrateBtn').addEventListener('click', () => {
     let avgX=0, avgY=0, avgZ=0; for(let i=0; i<50; i++){ const idx=(dataIdx-i+historySize)%historySize; avgX+=rawHistoryX[idx]; avgY+=rawHistoryY[idx]; avgZ+=rawHistoryZ[idx]; }
-    avgX/=50; avgY/=50; avgZ/=50; gMag = Math.sqrt(avgX**2+avgY**2+avgZ**2); gravityVec = { x:avgX/gMag, y:avgY/gMag, z:avgZ/gMag }; alert("校準完成");
+    avgX/=50; avgY/=50; avgZ/=50; gMag = Math.sqrt(avgX**2+avgY**2+avgZ**2); gravityVec = { x:avgX/gMag, y:avgY/gMag, z:avgZ/gMag }; alert("校準完成！");
 });
 
 document.getElementById('connectBtn').addEventListener('click', async () => {
