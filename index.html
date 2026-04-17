@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#007AFF">
 <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/color/192/000000/speed.png">
 <link rel="apple-touch-icon" href="https://img.icons8.com/color/192/000000/speed.png">
-<title>micro:bit VBT Pro v2.5.0</title>
+<title>micro:bit VBT Pro v2.5.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -71,7 +71,6 @@
     <div class="tab" data-tab="history">趨勢分析</div>
   </div>
   
-  <!-- Streamer Section -->
   <div id="streamer" class="content-section active">
     <div class="top-bar" style="display:flex; gap:8px; margin-bottom:10px; padding:0 5px;">
       <button id="connectBtn" class="btn btn-primary" style="flex:1;">連接 micro:bit</button>
@@ -81,33 +80,24 @@
       <div class="chart-container" style="height: 250px;">
           <canvas id="rawCanvas"></canvas>
       </div>
-      <div style="font-size: 0.7rem; text-align:center; margin-top:5px; color:#999;">XYZ 三軸原始數據 (1kHz)</div>
     </div>
   </div>
 
-  <!-- Recorder Section -->
   <div id="recorder" class="content-section">
     <div class="instruction">
-        <b>💡 多次重複切分教學：</b><br>
-        1. 錄製包含「多下」動作的整組過程。<br>
-        2. 停止錄製後，在圖表上<b>縮放並平移</b>找到第一下，點擊分析。<br>
-        3. 重複上述步驟切分出第二下、第三下...<br>
-        4. 所有的切分都會在「趨勢分析」中繪製成曲線。
+        <b>💡 自動排序說明：</b><br>
+        系統會自動根據動作發生的先後進行排列。即使您先分析後面的 Rep，圖表也會正確繪製。
     </div>
     <div class="controls">
         <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製組數</button>
         <button id="stopRecBtn" class="btn btn-success" disabled>⏹ 停止錄製</button>
         <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析圖表當前動作 (切分 Rep)</button>
     </div>
-    
     <div class="main-panel">
-        <div class="chart-container">
-            <canvas id="recordChart"></canvas>
-        </div>
+        <div class="chart-container"><canvas id="recordChart"></canvas></div>
     </div>
   </div>
 
-  <!-- History Section -->
   <div id="history" class="content-section">
     <div class="summary-grid">
         <div class="summary-card"><span class="summary-label">平均 Acc</span><span id="sumAvgAcc" class="summary-val">--</span></div>
@@ -115,13 +105,11 @@
         <div class="summary-card"><span class="summary-label">疲勞損耗</span><span id="sumFatigue" class="summary-val">--</span></div>
     </div>
     <div class="main-panel">
-        <div class="chart-container" style="height: 280px;">
-            <canvas id="historyChart"></canvas>
-        </div>
+        <div class="chart-container" style="height: 280px;"><canvas id="historyChart"></canvas></div>
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin: 10px 0;">
-        <span style="font-weight:bold;">歷史動作明細</span>
-        <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空所有紀錄</button>
+        <span style="font-weight:bold;">歷史動作 (按時間排序)</span>
+        <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空歷史</button>
     </div>
     <div id="historyList"></div>
   </div>
@@ -132,7 +120,6 @@
   </div>
 
 <script>
-// --- 全域變數 ---
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 let bleDevice = null, rxBuffer = new Uint8Array(0), currentScale = 8;
@@ -140,7 +127,7 @@ let gravityVec = { x: 0, y: 0, z: 1 }, gMag = 1.0;
 const historySize = 300, rawHistoryX = new Float32Array(historySize), rawHistoryY = new Float32Array(historySize), rawHistoryZ = new Float32Array(historySize);
 let dataIdx = 0, packetCount = 0, lastFpsTime = Date.now(), lastUIUpdateTime = 0;
 
-let isRecording = false, recordingData = [], segments = [];
+let isRecording = false, recordingData = [], segments = [], sessionStartTime = 0;
 let recordChart = null, historyChart = null;
 
 function init() {
@@ -157,7 +144,11 @@ function loadSegments() {
     if (saved) { try { segments = JSON.parse(saved); } catch(e) { segments = []; } }
 }
 
-function saveSegments() { localStorage.setItem('vbt_pro_segments', JSON.stringify(segments)); }
+function saveSegments() { 
+    // 存檔前確保數據是按絕對時間排序的
+    segments.sort((a, b) => a.absStartTime - b.absStartTime);
+    localStorage.setItem('vbt_pro_segments', JSON.stringify(segments)); 
+}
 
 function initCharts() {
     const ctxRec = document.getElementById('recordChart').getContext('2d');
@@ -222,7 +213,7 @@ function processData(x, y, z) {
 }
 
 document.getElementById('startRecBtn').addEventListener('click', () => {
-    recordingData = []; isRecording = true;
+    recordingData = []; isRecording = true; sessionStartTime = Date.now();
     document.getElementById('recordingStatus').style.display = 'inline';
     document.getElementById('startRecBtn').disabled = true; document.getElementById('stopRecBtn').disabled = false;
     document.getElementById('analyzeRangeBtn').disabled = true;
@@ -251,35 +242,44 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
         if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
     }
 
-    const note = prompt("請輸入動作備註 (Rep)", `Rep ${segments.length + 1}`);
+    const note = prompt("備註 (例如: 第 1 下)", `Rep ${segments.length + 1}`);
     if (note === null) return;
 
-    const segment = { id: Date.now(), date: new Date().toLocaleString(), note, peakAcc, peakRFD, timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` };
+    // absStartTime 確保排序正確
+    const segment = { 
+        id: Date.now(), 
+        absStartTime: sessionStartTime + (minT * 1000),
+        date: new Date(sessionStartTime + (minT * 1000)).toLocaleString(), 
+        note, peakAcc, peakRFD, timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` 
+    };
     segments.push(segment); saveSegments(); updateHistoryUI();
 });
 
 function updateHistoryUI() {
+    // 渲染列表時按時間由新到舊 (最新在最上面)
+    const sortedSegments = [...segments].sort((a, b) => b.absStartTime - a.absStartTime);
     const list = document.getElementById('historyList');
-    list.innerHTML = segments.slice().reverse().map((s) => `
+    list.innerHTML = sortedSegments.map((s) => `
         <div class="history-item">
             <div class="history-info"><span class="history-date">${s.date}</span><span class="history-note">${s.note}</span><span style="font-size:0.6rem; color:#999;">${s.timeRange}</span></div>
             <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div><button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button></div>
         </div>`).join('');
 
-    // 計算統計
-    if (segments.length > 0) {
-        const avgAcc = segments.reduce((a, b) => a + b.peakAcc, 0) / segments.length;
-        const avgRFD = segments.reduce((a, b) => a + b.peakRFD, 0) / segments.length;
-        const fatigue = segments.length > 1 ? ((segments[0].peakAcc - segments[segments.length-1].peakAcc) / segments[0].peakAcc * 100) : 0;
+    // 圖表顯示由舊到新 (反映趨勢)
+    const chronoSorted = [...segments].sort((a, b) => a.absStartTime - b.absStartTime);
+    if (chronoSorted.length > 0) {
+        const avgAcc = chronoSorted.reduce((a, b) => a + b.peakAcc, 0) / chronoSorted.length;
+        const avgRFD = chronoSorted.reduce((a, b) => a + b.peakRFD, 0) / chronoSorted.length;
+        const fatigue = chronoSorted.length > 1 ? ((chronoSorted[0].peakAcc - chronoSorted[chronoSorted.length-1].peakAcc) / chronoSorted[0].peakAcc * 100) : 0;
         document.getElementById('sumAvgAcc').innerText = avgAcc.toFixed(2) + " G";
         document.getElementById('sumAvgRFD').innerText = avgRFD.toFixed(0);
         document.getElementById('sumFatigue').innerText = fatigue.toFixed(1) + "%";
     }
 
-    historyChart.data.labels = segments.map(s => s.note);
-    historyChart.data.datasets[0].data = segments.map(s => s.peakAcc);
-    historyChart.data.datasets[1].data = segments.map(s => s.peakAcc); // Line Trend
-    historyChart.data.datasets[2].data = segments.map(s => s.peakRFD);
+    historyChart.data.labels = chronoSorted.map(s => s.note);
+    historyChart.data.datasets[0].data = chronoSorted.map(s => s.peakAcc);
+    historyChart.data.datasets[1].data = chronoSorted.map(s => s.peakAcc);
+    historyChart.data.datasets[2].data = chronoSorted.map(s => s.peakRFD);
     historyChart.update();
 }
 
