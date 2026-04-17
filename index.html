@@ -3,11 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- PWA & Icon Tags -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007AFF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VBT Pro">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>micro:bit VBT Pro v2.5.3</title>
+
+<title>micro:bit VBT Pro v2.6.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -32,7 +37,7 @@
   .btn-warning { background: var(--warning); color: white; }
   .btn-danger { background: var(--danger); color: white; }
   .btn-info { background: var(--info); color: white; }
-  .btn-sm { padding: 5px 10px; font-size: 0.7rem; border-radius: 5px; }
+  .btn-sm { padding: 6px 12px; font-size: 0.75rem; border-radius: 6px; }
 
   .main-panel { background: var(--panel-bg); border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #EEE; margin-bottom: 15px; }
   .chart-container { background: #FFF; border-radius: 10px; border: 1px solid #EEE; overflow: hidden; position: relative; height: 320px; }
@@ -43,8 +48,8 @@
   .history-item { background: #FFF; padding: 12px; border-radius: 10px; border: 1px solid #EEE; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--primary); position: relative; }
   .history-info { display: flex; flex-direction: column; flex: 1; }
   .history-date { font-size: 0.6rem; color: #AAA; }
-  .history-note { font-weight: bold; font-size: 0.9rem; margin: 2px 0; color: var(--primary); text-decoration: underline; cursor: pointer; }
-  .history-vals { font-size: 0.85rem; color: var(--text-dark); font-weight: 900; }
+  .history-note { font-weight: bold; font-size: 0.95rem; margin: 2px 0; color: var(--primary); text-decoration: underline; cursor: pointer; }
+  .history-vals { font-size: 0.9rem; color: var(--text-dark); font-weight: 900; }
 
   .monitor-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #FFF; border-top: 1px solid #EEE; padding: 5px 15px; font-family: monospace; font-size: 0.65rem; color: #333; display: flex; justify-content: space-between; align-items: center; z-index: 100; height: 30px; }
   
@@ -57,6 +62,9 @@
   .summary-card { background: #f8f9fa; padding: 8px; border-radius: 8px; text-align: center; border: 1px solid #eee; }
   .summary-label { font-size: 0.6rem; color: #888; display: block; }
   .summary-val { font-size: 0.9rem; font-weight: bold; color: var(--primary); }
+
+  .section-title { font-size: 0.85rem; font-weight: 900; margin: 15px 0 10px 5px; color: #555; display: flex; align-items: center; gap: 5px; }
+  .dot-rec { width: 8px; height: 8px; background: var(--danger); border-radius: 50%; }
 </style>
 </head>
 <body>
@@ -71,6 +79,7 @@
     <div class="tab" data-tab="history">趨勢分析</div>
   </div>
   
+  <!-- Tab 1: Streamer -->
   <div id="streamer" class="content-section active">
     <div class="top-bar" style="display:flex; gap:8px; margin-bottom:10px; padding:0 5px;">
       <button id="connectBtn" class="btn btn-primary" style="flex:1;">連接 micro:bit</button>
@@ -82,23 +91,28 @@
     </div>
   </div>
 
+  <!-- Tab 2: Recorder -->
   <div id="recorder" class="content-section">
     <div class="instruction">
-        <b>💡 儲存與備註：</b><br>
-        1. 停止錄製後，在波形圖縮放找到特定 Rep。<br>
-        2. 點擊藍色按鈕進行分析，隨後會跳出<b>備註輸入框</b>。<br>
-        3. 所有數據會自動儲存至本機，下次開啟即可查看。
+        <b>💡 錄製切分管理：</b><br>
+        1. 停止錄製後，縮放圖表並分析每個 Rep。<br>
+        2. 下方會列出「本次錄製」的所有 Rep。<br>
+        3. 您可以立即<b>修改備註</b>或<b>刪除切錯的 Rep</b>。
     </div>
     <div class="controls">
-        <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製組數</button>
+        <button id="startRecBtn" class="btn btn-danger">🔴 開始錄製</button>
         <button id="stopRecBtn" class="btn btn-success" disabled>⏹ 停止錄製</button>
-        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析並寫入備註 (儲存 Rep)</button>
+        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>🔍 分析當前範圍並加入清單</button>
     </div>
     <div class="main-panel">
         <div class="chart-container"><canvas id="recordChart"></canvas></div>
     </div>
+    
+    <div class="section-title"><div class="dot-rec"></div>本次錄製清單</div>
+    <div id="currentSessionList"></div>
   </div>
 
+  <!-- Tab 3: History -->
   <div id="history" class="content-section">
     <div class="summary-grid">
         <div class="summary-card"><span class="summary-label">平均 Acc</span><span id="sumAvgAcc" class="summary-val">--</span></div>
@@ -108,8 +122,8 @@
     <div class="main-panel">
         <div class="chart-container" style="height: 280px;"><canvas id="historyChart"></canvas></div>
     </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin: 10px 0;">
-        <span style="font-weight:bold;">歷史動作 (點擊備註可修改)</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 15px 5px 10px 5px;">
+        <span style="font-weight:bold; font-size:0.85rem;">歷史動作管理</span>
         <button id="clearHistoryBtn" class="btn btn-danger btn-sm">清空歷史</button>
     </div>
     <div id="historyList"></div>
@@ -119,7 +133,7 @@
     <div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div>
     <div style="display:flex; gap:10px;">
         <span id="fpsDisplay">0 Hz</span>
-        <span style="color:#CCC;">v2.5.3</span>
+        <span style="color:#AAA; font-weight:bold;">v2.6.0</span>
     </div>
   </div>
 
@@ -139,8 +153,9 @@ function init() {
     loadSegments();
     initCharts();
     updateHistoryUI();
+    // PWA Service Worker (only in secure context)
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-      navigator.serviceWorker.register('./sw.js').catch(e => console.error(e));
+      navigator.serviceWorker.register('./sw.js').catch(e => console.error("SW failed:", e));
     }
 }
 
@@ -216,11 +231,13 @@ function processData(x, y, z) {
     dataIdx = (dataIdx + 1) % historySize;
 }
 
+// --- 錄製控制器 ---
 document.getElementById('startRecBtn').addEventListener('click', () => {
     recordingData = []; isRecording = true; sessionStartTime = Date.now();
     document.getElementById('recordingStatus').style.display = 'inline';
     document.getElementById('startRecBtn').disabled = true; document.getElementById('stopRecBtn').disabled = false;
     document.getElementById('analyzeRangeBtn').disabled = true;
+    document.getElementById('currentSessionList').innerHTML = ""; // 清空本次清單
 });
 
 document.getElementById('stopRecBtn').addEventListener('click', () => {
@@ -235,7 +252,7 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     const scaleX = recordChart.scales.x;
     const minT = scaleX.min, maxT = scaleX.max;
     const visibleData = recordingData.filter(d => d.x >= minT && d.x <= maxT);
-    if (visibleData.length < 10) return alert("選取範圍過小");
+    if (visibleData.length < 10) return alert("範圍太小");
 
     let peakAcc = 0; visibleData.forEach(d => { if(d.y > peakAcc) peakAcc = d.y; });
     let peakRFD = 0; const dt = 0.001;
@@ -247,31 +264,33 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     }
 
     const defaultNote = `Rep ${segments.length + 1}`;
-    const note = prompt("請輸入動作備註 (例如: 100kg 第一下)", defaultNote) || defaultNote;
-
-    const segment = { 
-        id: Date.now(), 
-        absStartTime: sessionStartTime + (minT * 1000),
-        date: new Date(sessionStartTime + (minT * 1000)).toLocaleString(), 
-        note, peakAcc, peakRFD, timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` 
-    };
-    segments.push(segment); saveSegments(); updateHistoryUI();
+    const note = prompt("輸入備註:", defaultNote) || defaultNote;
+    const segment = { id: Date.now(), absStartTime: sessionStartTime + (minT * 1000), date: new Date(sessionStartTime + (minT * 1000)).toLocaleString(), note, peakAcc, peakRFD, timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` };
+    
+    segments.push(segment);
+    saveSegments();
+    updateHistoryUI();
+    renderCurrentSession(sessionStartTime);
 });
+
+// 渲染「本次錄製」的清單
+function renderCurrentSession(startTime) {
+    const sessionReps = segments.filter(s => s.absStartTime >= startTime);
+    const list = document.getElementById('currentSessionList');
+    list.innerHTML = sessionReps.slice().reverse().map(s => `
+        <div class="history-item">
+            <div class="history-info"><span class="history-note" onclick="editNote(${s.id})">${s.note}</span><span style="font-size:0.6rem; color:#999;">${s.timeRange}</span></div>
+            <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G</div><button onclick="deleteSegment(${s.id}, true)" class="btn-sm btn-danger">刪除</button></div>
+        </div>`).join('');
+}
 
 function updateHistoryUI() {
     const sortedSegments = [...segments].sort((a, b) => b.absStartTime - a.absStartTime);
     const list = document.getElementById('historyList');
-    list.innerHTML = sortedSegments.map((s) => `
+    list.innerHTML = sortedSegments.map(s => `
         <div class="history-item">
-            <div class="history-info">
-                <span class="history-date">${s.date}</span>
-                <span class="history-note" onclick="editNote(${s.id})">${s.note}</span>
-                <span style="font-size:0.6rem; color:#999;">${s.timeRange}</span>
-            </div>
-            <div style="text-align:right;">
-                <div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div>
-                <button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button>
-            </div>
+            <div class="history-info"><span class="history-date">${s.date}</span><span class="history-note" onclick="editNote(${s.id})">${s.note}</span><span style="font-size:0.6rem; color:#999;">${s.timeRange}</span></div>
+            <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div><button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button></div>
         </div>`).join('');
 
     const chronoSorted = [...segments].sort((a, b) => a.absStartTime - b.absStartTime);
@@ -295,16 +314,23 @@ window.editNote = function(id) {
     const s = segments.find(x => x.id === id);
     if (!s) return;
     const newNote = prompt("修改備註:", s.note);
-    if (newNote !== null) {
-        s.note = newNote;
-        saveSegments();
-        updateHistoryUI();
-    }
+    if (newNote !== null) { s.note = newNote; saveSegments(); updateHistoryUI(); if(isRecording || recordingData.length > 0) renderCurrentSession(sessionStartTime); }
 };
 
-window.deleteSegment = function(id) { if(confirm("確定刪除此 Rep？")){ segments = segments.filter(s => s.id !== id); saveSegments(); updateHistoryUI(); } };
-document.getElementById('clearHistoryBtn').addEventListener('click', () => { if(confirm("確定清空所有歷史紀錄？")){ segments = []; saveSegments(); updateHistoryUI(); } });
+window.deleteSegment = function(id, isCurrentSession = false) {
+    if(!confirm("確定刪除此 Rep？")) return;
+    segments = segments.filter(s => s.id !== id);
+    saveSegments();
+    updateHistoryUI();
+    if(isCurrentSession) renderCurrentSession(sessionStartTime);
+};
 
+document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+    if(!confirm("確定清空所有歷史？")) return;
+    segments = []; saveSegments(); updateHistoryUI(); document.getElementById('currentSessionList').innerHTML = "";
+});
+
+// --- UI & BT ---
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab, .content-section').forEach(el => el.classList.remove('active'));
@@ -314,7 +340,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 document.getElementById('calibrateBtn').addEventListener('click', () => {
     let avgX=0, avgY=0, avgZ=0; for(let i=0; i<50; i++){ const idx=(dataIdx-i+historySize)%historySize; avgX+=rawHistoryX[idx]; avgY+=rawHistoryY[idx]; avgZ+=rawHistoryZ[idx]; }
-    avgX/=50; avgY/=50; avgZ/=50; gMag = Math.sqrt(avgX**2+avgY**2+avgZ**2); gravityVec = { x:avgX/gMag, y:avgY/gMag, z:avgZ/gMag }; alert("校準完成！");
+    avgX/=50; avgY/=50; avgZ/=50; gMag = Math.sqrt(avgX**2+avgY**2+avgZ**2); gravityVec = { x:avgX/gMag, y:avgY/gMag, z:avgZ/gMag }; alert("校準完成");
 });
 
 document.getElementById('connectBtn').addEventListener('click', async () => {

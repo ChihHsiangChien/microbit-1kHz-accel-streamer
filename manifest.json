@@ -1,7 +1,7 @@
 {
   "name": "micro:bit VBT Pro Analysis",
   "short_name": "VBT Pro",
-  "description": "High-speed 1kHz Accelerometer Analysis for micro:bit",
+  "description": "Professional 1kHz VBT Analysis",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#F5F5F5",
@@ -12,7 +12,13 @@
       "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     },
     {
       "src": "https://img.icons8.com/color/512/000000/speed.png",
