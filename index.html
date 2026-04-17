@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#007AFF">
-<link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/color/192/000000/speed.png">
-<link rel="apple-touch-icon" href="https://img.icons8.com/color/192/000000/speed.png">
-<title>micro:bit VBT Pro v2.5.1</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>micro:bit VBT Pro v2.5.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -145,7 +145,6 @@ function loadSegments() {
 }
 
 function saveSegments() { 
-    // 存檔前確保數據是按絕對時間排序的
     segments.sort((a, b) => a.absStartTime - b.absStartTime);
     localStorage.setItem('vbt_pro_segments', JSON.stringify(segments)); 
 }
@@ -242,10 +241,9 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
         if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
     }
 
-    const note = prompt("備註 (例如: 第 1 下)", `Rep ${segments.length + 1}`);
+    const note = prompt("備註 (Rep)", `Rep ${segments.length + 1}`);
     if (note === null) return;
 
-    // absStartTime 確保排序正確
     const segment = { 
         id: Date.now(), 
         absStartTime: sessionStartTime + (minT * 1000),
@@ -256,7 +254,6 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
 });
 
 function updateHistoryUI() {
-    // 渲染列表時按時間由新到舊 (最新在最上面)
     const sortedSegments = [...segments].sort((a, b) => b.absStartTime - a.absStartTime);
     const list = document.getElementById('historyList');
     list.innerHTML = sortedSegments.map((s) => `
@@ -265,7 +262,6 @@ function updateHistoryUI() {
             <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G / ${s.peakRFD.toFixed(0)}</div><button onclick="deleteSegment(${s.id})" class="btn-sm btn-danger" style="margin-top:5px;">刪除</button></div>
         </div>`).join('');
 
-    // 圖表顯示由舊到新 (反映趨勢)
     const chronoSorted = [...segments].sort((a, b) => a.absStartTime - b.absStartTime);
     if (chronoSorted.length > 0) {
         const avgAcc = chronoSorted.reduce((a, b) => a + b.peakAcc, 0) / chronoSorted.length;
