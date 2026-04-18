@@ -12,7 +12,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 
-<title>micro:bit VBT Pro v2.7.0</title>
+<title>micro:bit VBT Pro v0.1.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -121,8 +121,9 @@
         <button id="startAutoRecBtn" class="btn btn-danger full-width" style="margin-top:5px; height:50px;">開始錄製</button>
     </div>
 
-    <div class="controls">
-        <button id="analyzeRangeBtn" class="btn btn-info full-width" disabled>分析圖表當前範圍</button>
+    <div class="controls" style="display:flex; gap:8px;">
+        <button id="analyzeRangeBtn" class="btn btn-info" style="flex:2;" disabled>分析當前範圍</button>
+        <button id="saveRawSetBtn" class="btn btn-warning" style="flex:1;" disabled>儲存原始資料</button>
     </div>
 
     <div class="main-panel">
@@ -185,7 +186,7 @@
     <div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div>
     <div style="display:flex; gap:10px;">
         <span id="fpsDisplay">0 Hz</span>
-        <span style="color:#AAA; font-weight:bold;">v2.7.0</span>
+        <span style="color:#AAA; font-weight:bold;">v0.1.0</span>
     </div>
   </div>
 
@@ -312,7 +313,7 @@ function processData(x, y, z) {
     }
     rawHistoryX[dataIdx] = x; rawHistoryY[dataIdx] = y; rawHistoryZ[dataIdx] = z;
     const pureVerticalAcc = (x * gravityVec.x + y * gravityVec.y + z * gravityVec.z) - gMag;
-    if (isRecording) { recordingData.push({ x: recordingData.length * 0.001, y: pureVerticalAcc }); }
+    if (isRecording) { recordingData.push({ x: recordingData.length * 0.001, y: pureVerticalAcc, ax: x, ay: y, az: z }); }
     dataIdx = (dataIdx + 1) % historySize;
 }
 
@@ -375,6 +376,7 @@ function stopActualRecording() {
     isRecording = false;
     document.getElementById('timerOverlay').style.display = 'none';
     document.getElementById('analyzeRangeBtn').disabled = false;
+    document.getElementById('saveRawSetBtn').disabled = false;
     
     const displayData = [];
     for(let i=0; i<recordingData.length; i+=10) displayData.push(recordingData[i]);
@@ -406,7 +408,7 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     if (startIdx !== -1 && endIdx !== -1) {
         for (let i = startIdx; i <= endIdx; i++) {
             const rfd = (2 * recordingData[i+2].y + recordingData[i+1].y - recordingData[i-1].y - 2 * recordingData[i-2].y) / (10 * dt);
-            if (Math.abs(rfd) > peakRFD) peakRFD = Math.abs(rfd);
+            if (rfd > peakRFD) peakRFD = rfd;
         }
     }
     const sessionRepCount = segments.filter(s => s.sessionId === (sessionStartTime || 0)).length;
@@ -422,6 +424,93 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     };
     segments.push(segment); saveSegments(); updateHistoryUI(); renderCurrentSession(sessionStartTime);
 });
+
+window.saveRawSet = function() {
+    if (recordingData.length === 0) return;
+    const rawX = recordingData.map(d => parseFloat((d.ax || 0).toFixed(4)));
+    const rawY = recordingData.map(d => parseFloat((d.ay || 0).toFixed(4)));
+    const rawZ = recordingData.map(d => parseFloat((d.az || 0).toFixed(4)));
+    const rawV = recordingData.map(d => parseFloat(d.y.toFixed(4)));
+    const segment = {
+        id: Date.now(),
+        sessionId: sessionStartTime || Date.now(),
+        absStartTime: sessionStartTime,
+        peakAcc: 0, peakRFD: 0,
+        note: "原始錄製資料",
+        timeRange: `0s - ${(recordingData.length*0.001).toFixed(1)}s`,
+        date: new Date().toLocaleString(),
+        rawX, rawY, rawZ, rawV,
+        rawData: rawV, // 保持向後相容
+        isRaw: true
+    };
+    segments.push(segment);
+    saveSegments();
+    alert("原始資料已儲存至歷史紀錄");
+    updateHistoryUI();
+};
+
+window.exportRawCSV = function(sid) {
+    const rawSeg = segments.find(s => s.sessionId === sid && s.isRaw);
+    if (!rawSeg) return alert("找不到原始資料");
+    
+    let csvContent = "Time(s),AccX(G),AccY(G),AccZ(G),VerticalAcc(G)\n";
+    if (rawSeg.rawX) {
+        for (let i = 0; i < rawSeg.rawX.length; i++) {
+            csvContent += `${(i * 0.001).toFixed(3)},${rawSeg.rawX[i]},${rawSeg.rawY[i]},${rawSeg.rawZ[i]},${rawSeg.rawV[i]}\n`;
+        }
+    } else {
+        csvContent = "Time(s),VerticalAcc(G)\n";
+        const data = rawSeg.rawData || [];
+        for (let i = 0; i < data.length; i++) {
+            csvContent += `${(i * 0.001).toFixed(3)},${data[i]}\n`;
+        }
+    }
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `vbt_raw_${new Date(sid).toISOString().slice(0,19).replace(/:/g,'-')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+document.getElementById('saveRawSetBtn').addEventListener('click', saveRawSet);
+
+window.loadToAnalyzer = function(sid) {
+    const rawSeg = segments.find(s => s.sessionId === sid && s.isRaw);
+    if (!rawSeg) return alert("找不到原始資料");
+    
+    if (rawSeg.rawX) {
+        recordingData = rawSeg.rawV.map((v, i) => ({ 
+            x: i * 0.001, 
+            y: v, 
+            ax: rawSeg.rawX[i], 
+            ay: rawSeg.rawY[i], 
+            az: rawSeg.rawZ[i] 
+        }));
+    } else {
+        recordingData = (rawSeg.rawData || []).map((y, i) => ({ x: i * 0.001, y: y }));
+    }
+    sessionStartTime = rawSeg.absStartTime;
+    
+    // 更新圖表
+    recordChart.data.datasets[0].data = recordingData;
+    recordChart.update();
+    document.getElementById('analyzeRangeBtn').disabled = false;
+    document.getElementById('saveRawSetBtn').disabled = false;
+    
+    // 切換分頁
+    document.querySelectorAll('.tab, .content-section').forEach(el => el.classList.remove('active'));
+    const recTab = document.querySelector('[data-tab="recorder"]');
+    recTab.classList.add('active');
+    document.getElementById('recorder').classList.add('active');
+    
+    renderCurrentSession(sessionStartTime);
+    alert("已載入原始資料，您現在可以進行切分分析。");
+};
 
 function renderCurrentSession(startTime) {
     const sessionReps = segments.filter(s => s.absStartTime >= startTime);
@@ -475,6 +564,10 @@ function updateHistoryUI() {
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                             編輯
                         </span>
+                        ${set.reps.some(r => r.isRaw) ? `
+                            <span onclick="event.stopPropagation(); loadToAnalyzer(${set.id})" style="font-size:0.7rem; cursor:pointer; background:var(--warning); color:white; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">🔍 啟動分析器</span>
+                            <span onclick="event.stopPropagation(); exportRawCSV(${set.id})" style="font-size:0.7rem; cursor:pointer; background:var(--success); color:white; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">📥 匯出 CSV</span>
+                        ` : ''}
                     </div>
                     <div style="margin-top:4px;">
                         ${set.reps.map((r, i) => `<span style="font-size:0.6rem; background:#F0F0F0; padding:1px 4px; border-radius:3px; margin-right:3px;">R${i+1}:${r.peakAcc.toFixed(1)}</span>`).join('')}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vbt-pro-v2.7.1';
+const CACHE_NAME = 'vbt-pro-v0.1.0';
 const ASSETS = [
   './',
   './index.html',
