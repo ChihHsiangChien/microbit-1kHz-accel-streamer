@@ -1,7 +1,11 @@
-const CACHE_NAME = 'accel-streamer-v2';
+const CACHE_NAME = 'vbt-pro-v2.7.1';
 const ASSETS = [
+  './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './icon.svg'
 ];
 
 self.addEventListener('install', (e) => {
