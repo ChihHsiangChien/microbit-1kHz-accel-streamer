@@ -69,9 +69,6 @@
   .drawer-active .drawer-content { bottom: 0; }
   .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #EEE; padding-bottom: 10px; }
   .drawer-close { font-size: 1.5rem; cursor: pointer; color: #999; }
-  
-  .fab-list { position: fixed; bottom: 60px; right: 20px; width: 60px; height: 60px; border-radius: 30px; background: var(--primary); color: white; display: none; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 4px 15px rgba(0,0,122,0.3); z-index: 1100; cursor: pointer; border: none; padding: 0; line-height: 1; }
-  .fab-active { display: flex !important; }
 </style>
 </head>
 <body>
@@ -121,9 +118,10 @@
         <button id="startAutoRecBtn" class="btn btn-danger full-width" style="margin-top:5px; height:50px;">開始錄製</button>
     </div>
 
-    <div class="controls" style="display:flex; gap:8px;">
+    <div class="controls" style="display:flex; gap:8px; align-items:center;">
         <button id="analyzeRangeBtn" class="btn btn-info" style="flex:2;" disabled>分析當前範圍</button>
-        <button id="saveRawSetBtn" class="btn btn-warning" style="flex:1;" disabled>儲存原始資料</button>
+        <button id="saveRawSetBtn" class="btn btn-warning" style="flex:1; white-space:nowrap;" disabled>儲存原始</button>
+        <button id="discardDataBtn" class="btn-sm btn-danger" style="height:44px; padding:0 15px; flex:0; display:flex; align-items:center; justify-content:center;" disabled title="拋棄當前資料">🗑️</button>
     </div>
 
     <div class="main-panel">
@@ -139,31 +137,15 @@
 
   <!-- Tab 3: History -->
   <div id="history" class="content-section">
-    <div class="summary-grid">
-        <div class="summary-card"><span class="summary-label">平均 Acc</span><span id="sumAvgAcc" class="summary-val">--</span></div>
-        <div class="summary-card"><span class="summary-label">平均 RFD</span><span id="sumAvgRFD" class="summary-val">--</span></div>
-        <div class="summary-card"><span class="summary-label">疲勞損耗</span><span id="sumFatigue" class="summary-val">--</span></div>
-    </div>
-    <div class="main-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span id="historyChartTitle" style="font-size:0.85rem; font-weight:bold; color:var(--primary);">📈 總體趨勢 (所有 Reps)</span>
-            <button id="resetHistoryChartBtn" class="btn-sm btn-info" style="display:none; padding:4px 10px;">顯示總體趨勢</button>
-        </div>
-        <div class="chart-container" style="height: 320px;"><canvas id="historyChart"></canvas></div>
+    <div id="historyListMain" style="margin-top:10px;"></div>
+    
+    <div style="margin-top:20px; text-align:center;">
+        <button id="clearHistoryBtn" class="btn-sm btn-danger" style="background:transparent; color:var(--danger); border:1px solid var(--danger); opacity:0.6; font-size:0.7rem; display:inline-flex; align-items:center; gap:4px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            清空所有歷史紀錄
+        </button>
     </div>
     
-    <div style="margin-top:15px; display:flex; flex-direction:column; gap:15px;">
-        <button id="openHistoryDrawerBtn" class="btn btn-primary" style="height:50px; display:flex; align-items:center; justify-content:center; gap:8px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-            瀏覽歷史紀錄
-        </button>
-        <div style="text-align:center;">
-            <button id="clearHistoryBtn" class="btn-sm btn-danger" style="background:transparent; color:var(--danger); border:1px solid var(--danger); opacity:0.6; font-size:0.7rem; display:inline-flex; align-items:center; gap:4px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                清空所有歷史紀錄
-            </button>
-        </div>
-    </div>
   </div>
 
   <!-- History Drawer -->
@@ -177,10 +159,62 @@
     </div>
   </div>
 
-  <!-- Floating Button -->
-  <button id="fabList" class="fab-list">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-  </button>
+  <!-- Rep Detail Overlay -->
+  <div id="repDetailOverlay" class="drawer-overlay" style="z-index: 1100;">
+    <div class="drawer-content" style="height: 90vh; display:flex; flex-direction:column;">
+        <div class="drawer-header">
+            <span id="repDetailTitle" style="font-weight:bold; font-size:1.1rem; color:var(--primary);">Rep 細節分析</span>
+            <span class="drawer-close" onclick="closeRepDetail()">&times;</span>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding-bottom:20px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+                <div class="main-panel" style="margin-bottom:0; text-align:center; padding:10px;">
+                    <div style="font-size:0.7rem; color:#666;">Peak Acc</div>
+                    <div id="detailPeakAcc" style="font-size:1.2rem; font-weight:bold; color:var(--primary);">--</div>
+                </div>
+                <div class="main-panel" style="margin-bottom:0; text-align:center; padding:10px;">
+                    <div style="font-size:0.7rem; color:#666;">Peak Velocity</div>
+                    <div id="detailPeakVel" style="font-size:1.2rem; font-weight:bold; color:var(--success);">--</div>
+                </div>
+            </div>
+            
+            <div style="font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:5px;">📊 加速度 (Acc-t)</div>
+            <div class="chart-container" style="height: 200px; margin-bottom:15px;"><canvas id="repAccChart"></canvas></div>
+            
+            <div style="font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:5px;">📈 速度 (Vel-t) <span style="font-weight:normal; font-size:0.6rem;">(經過漂移修正積分)</span></div>
+            <div class="chart-container" style="height: 200px;"><canvas id="repVelChart"></canvas></div>
+            
+            <div style="margin-top:20px; display:flex; gap:10px;">
+                <button id="detailEditNoteBtn" class="btn btn-primary" style="flex:1; font-size:0.9rem;">修改備註</button>
+                <button id="detailDeleteBtn" class="btn btn-danger" style="flex:1; font-size:0.9rem;">刪除此 Rep</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- Floating Button 被移除，因與瀏覽歷史紀錄按鈕功能重複 -->
+
+  <!-- Set Detail Overlay -->
+  <div id="setDetailOverlay" class="drawer-overlay">
+    <div class="drawer-content" style="height: 90vh; display:flex; flex-direction:column;">
+        <div class="drawer-header">
+            <span id="setDetailTitle" style="font-weight:bold; font-size:1.1rem; color:var(--primary);">組細節趨勢</span>
+            <span class="drawer-close" onclick="closeSetDetail()">&times;</span>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding-bottom:20px;">
+            <div style="font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:5px;">📈 表現趨勢 (Peak Acc & RFD)</div>
+            <div class="chart-container" style="height: 250px; margin-bottom:20px;"><canvas id="setTrendChart"></canvas></div>
+            
+            <div style="font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:10px;">📋 動作清單 (點擊看波形)</div>
+            <div id="setRepList" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap:10px;"></div>
+            
+            <div style="margin-top:25px; display:flex; gap:10px;">
+                <button id="setDetailExportBtn" onclick="exportData(currentDetailSetId)" class="btn btn-primary" style="flex:1; font-size:0.9rem;">📥 匯出數據 CSV</button>
+                <button onclick="deleteSet(currentDetailSetId); closeSetDetail();" class="btn btn-danger" style="flex:1; font-size:0.9rem;">🗑️ 刪除整組</button>
+            </div>
+        </div>
+    </div>
+  </div>
 
   <div class="monitor-footer">
     <div>G: <span id="rX">0.0</span>, <span id="rY">0.0</span>, <span id="rZ">0.0</span></div>
@@ -201,14 +235,60 @@ let dataIdx = 0, packetCount = 0, lastFpsTime = Date.now(), lastUIUpdateTime = 0
 
 let isRecording = false, recordingData = [], segments = [], sessionStartTime = 0;
 let recordChart = null, historyChart = null, sessionTrendChart = null;
+let repAccChart = null, repVelChart = null, setTrendChart = null;
+let currentDetailSetId = null;
+
+// --- Web Worker 分析引擎 ---
+const workerCode = `
+self.onmessage = function(e) {
+    const { data, dt, alpha, windowSize } = e.data;
+    const n = data.length;
+    if (n < windowSize) {
+        self.postMessage({ error: "數據範圍不足以進行濾波" });
+        return;
+    }
+
+    // 1. 中值濾波 (Median Filter) - 剔除突波
+    const medianFiltered = new Float32Array(n);
+    const half = Math.floor(windowSize / 2);
+    for (let i = 0; i < n; i++) {
+        const window = [];
+        for (let j = -half; j <= half; j++) {
+            const idx = Math.max(0, Math.min(n - 1, i + j));
+            window.push(data[idx].y);
+        }
+        window.sort((a, b) => a - b);
+        medianFiltered[i] = window[half];
+    }
+
+    // 2. 低通濾波 (EMA Filter) - 平滑曲線
+    const filtered = new Float32Array(n);
+    filtered[0] = medianFiltered[0];
+    for (let i = 1; i < n; i++) {
+        filtered[i] = alpha * medianFiltered[i] + (1 - alpha) * filtered[i - 1];
+    }
+
+    // 3. 計算峰值加速度 (Peak Acc)
+    let peakAcc = 0;
+    for (let i = 0; i < n; i++) {
+        if (filtered[i] > peakAcc) peakAcc = filtered[i];
+    }
+
+    // 4. 計算用力率 (Peak RFD) - 五點中心差分
+    let peakRFD = 0;
+    for (let i = 2; i < n - 2; i++) {
+        const rfd = (2 * filtered[i+2] + filtered[i+1] - filtered[i-1] - 2 * filtered[i-2]) / (10 * dt);
+        if (rfd > peakRFD) peakRFD = rfd;
+    }
+
+    self.postMessage({ peakAcc, peakRFD });
+};
+`;
+const analysisBlob = new Blob([workerCode], { type: 'application/javascript' });
+const analysisWorker = new Worker(URL.createObjectURL(analysisBlob));
 
 function init() {
     loadSegments(); initCharts(); updateHistoryUI();
-    // 初始檢查 FAB 顯示狀態
-    const activeTab = document.querySelector('.tab.active');
-    if (activeTab && activeTab.dataset.tab === 'history') {
-        document.getElementById('fabList').classList.add('fab-active');
-    }
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
       navigator.serviceWorker.register('./sw.js').catch(e => console.error(e));
     }
@@ -220,8 +300,21 @@ function loadSegments() {
 }
 
 function saveSegments() { 
-    segments.sort((a, b) => a.absStartTime - b.absStartTime);
-    localStorage.setItem('vbt_pro_segments', JSON.stringify(segments)); 
+    try {
+        segments.sort((a, b) => a.absStartTime - b.absStartTime);
+        const data = JSON.stringify(segments);
+        localStorage.setItem('vbt_pro_segments', data); 
+        console.log("儲存成功，當前佔用容量: " + (data.length / 1024).toFixed(2) + " KB");
+        return true;
+    } catch (e) {
+        console.error("儲存失敗:", e);
+        if (e.name === 'QuotaExceededError') {
+            alert("儲存空間已滿！請先到「趨勢分析」清空一些舊的歷史紀錄，特別是帶有原始資料的項目。");
+        } else {
+            alert("儲存時發生錯誤：" + e.message);
+        }
+        return false;
+    }
 }
 
 function initCharts() {
@@ -236,8 +329,10 @@ function initCharts() {
         }
     });
 
-    const ctxHist = document.getElementById('historyChart').getContext('2d');
-    historyChart = new Chart(ctxHist, {
+    // historyChart 已從 HTML 移除，不再初始化
+
+    const ctxSet = document.getElementById('setTrendChart').getContext('2d');
+    setTrendChart = new Chart(ctxSet, {
         type: 'line',
         data: { labels: [], datasets: [
             { label: 'Peak Acc (G)', data: [], borderColor: '#2196F3', backgroundColor: 'rgba(33, 150, 243, 0.1)', fill: true, yAxisID: 'y', tension: 0.2 },
@@ -266,6 +361,20 @@ function initCharts() {
                 y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'RFD (G/s)' } }
             }
         }
+    });
+
+    const ctxAcc = document.getElementById('repAccChart').getContext('2d');
+    repAccChart = new Chart(ctxAcc, {
+        type: 'line',
+        data: { datasets: [{ label: 'Acc (G)', data: [], borderColor: '#2196F3', borderWidth: 2, pointRadius: 0, fill: false }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { x: { type: 'linear', title: { display: true, text: '秒' } } } }
+    });
+
+    const ctxVel = document.getElementById('repVelChart').getContext('2d');
+    repVelChart = new Chart(ctxVel, {
+        type: 'line',
+        data: { datasets: [{ label: 'Vel (m/s)', data: [], borderColor: '#4CAF50', borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: 'rgba(76, 175, 80, 0.1)' }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { x: { type: 'linear', title: { display: true, text: '秒' } } } }
     });
 }
 
@@ -377,6 +486,7 @@ function stopActualRecording() {
     document.getElementById('timerOverlay').style.display = 'none';
     document.getElementById('analyzeRangeBtn').disabled = false;
     document.getElementById('saveRawSetBtn').disabled = false;
+    document.getElementById('discardDataBtn').disabled = false;
     
     const displayData = [];
     for(let i=0; i<recordingData.length; i+=10) displayData.push(recordingData[i]);
@@ -399,30 +509,52 @@ document.getElementById('analyzeRangeBtn').addEventListener('click', () => {
     const scaleX = recordChart.scales.x;
     const minT = scaleX.min, maxT = scaleX.max;
     const visibleData = recordingData.filter(d => d.x >= minT && d.x <= maxT);
-    if (visibleData.length < 10) return alert("範圍太小");
+    
+    if (visibleData.length < 15) return alert("選取範圍太短，無法分析");
 
-    let peakAcc = 0; visibleData.forEach(d => { if(d.y > peakAcc) peakAcc = d.y; });
-    let peakRFD = 0; const dt = 0.001;
-    const startIdx = Math.max(2, recordingData.findIndex(d => d.x >= minT));
-    const endIdx = Math.min(recordingData.length - 3, recordingData.findIndex(d => d.x >= maxT));
-    if (startIdx !== -1 && endIdx !== -1) {
-        for (let i = startIdx; i <= endIdx; i++) {
-            const rfd = (2 * recordingData[i+2].y + recordingData[i+1].y - recordingData[i-1].y - 2 * recordingData[i-2].y) / (10 * dt);
-            if (rfd > peakRFD) peakRFD = rfd;
+    const btn = document.getElementById('analyzeRangeBtn');
+    const originalText = btn.innerText;
+    btn.innerText = "分析中...";
+    btn.disabled = true;
+
+    analysisWorker.onmessage = function(e) {
+        btn.innerText = originalText;
+        btn.disabled = false;
+
+        if (e.data.error) return alert(e.data.error);
+
+        const { peakAcc, peakRFD } = e.data;
+        const sessionRepCount = segments.filter(s => s.sessionId === (sessionStartTime || 0)).length;
+        const defaultNote = `Rep ${sessionRepCount + 1}`;
+        const note = prompt(`分析完成！\nPeak Acc: ${peakAcc.toFixed(2)}G\nPeak RFD: ${peakRFD.toFixed(0)}G/s\n\n請輸入備註:`, defaultNote) || defaultNote;
+        
+        const segment = { 
+            id: Date.now(), 
+            sessionId: sessionStartTime || Date.now(),
+            absStartTime: sessionStartTime + (minT * 1000), 
+            date: new Date(sessionStartTime + (minT * 1000)).toLocaleString(), 
+            note, peakAcc, peakRFD, 
+            timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s`,
+            // 自動儲存該 Rep 的波形切片，以便隨時查看 VT 圖
+            rawV: visibleData.map(d => parseFloat(d.y.toFixed(4))),
+            rawX: visibleData.map(d => parseFloat((d.ax || 0).toFixed(4))),
+            rawY: visibleData.map(d => parseFloat((d.ay || 0).toFixed(4))),
+            rawZ: visibleData.map(d => parseFloat((d.az || 0).toFixed(4)))
+        };
+
+        segments.push(segment); 
+        if (saveSegments()) {
+            updateHistoryUI(); 
+            renderCurrentSession(sessionStartTime);
         }
-    }
-    const sessionRepCount = segments.filter(s => s.sessionId === (sessionStartTime || 0)).length;
-    const defaultNote = `Rep ${sessionRepCount + 1}`;
-    const note = prompt("輸入備註:", defaultNote) || defaultNote;
-    const segment = { 
-        id: Date.now(), 
-        sessionId: sessionStartTime || Date.now(),
-        absStartTime: sessionStartTime + (minT * 1000), 
-        date: new Date(sessionStartTime + (minT * 1000)).toLocaleString(), 
-        note, peakAcc, peakRFD, 
-        timeRange: `${minT.toFixed(2)}s - ${maxT.toFixed(2)}s` 
     };
-    segments.push(segment); saveSegments(); updateHistoryUI(); renderCurrentSession(sessionStartTime);
+
+    analysisWorker.postMessage({
+        data: visibleData,
+        dt: 0.001,
+        alpha: 0.15, // 低通濾波係數
+        windowSize: 7 // 中值濾波窗口
+    });
 });
 
 window.saveRawSet = function() {
@@ -444,38 +576,70 @@ window.saveRawSet = function() {
         isRaw: true
     };
     segments.push(segment);
+    if (saveSegments()) {
+        updateHistoryUI();
+    }
+};
+
+window.discardCurrentData = function() {
+    if (!confirm("確定要拋棄當前錄製的所有資料與本次分析結果嗎？")) return;
+    
+    recordingData = [];
+    recordChart.data.datasets[0].data = [];
+    recordChart.update();
+    
+    // 移除本次 Session 產生的所有 Reps 與原始資料
+    segments = segments.filter(s => s.sessionId !== sessionStartTime);
     saveSegments();
-    alert("原始資料已儲存至歷史紀錄");
+    
+    document.getElementById('analyzeRangeBtn').disabled = true;
+    document.getElementById('saveRawSetBtn').disabled = true;
+    document.getElementById('discardDataBtn').disabled = true;
+    
+    renderCurrentSession(0);
     updateHistoryUI();
 };
 
-window.exportRawCSV = function(sid) {
-    const rawSeg = segments.find(s => s.sessionId === sid && s.isRaw);
-    if (!rawSeg) return alert("找不到原始資料");
+document.getElementById('discardDataBtn').addEventListener('click', discardCurrentData);
+
+window.exportData = function(sid_or_id) {
+    const s = segments.find(x => x.id === sid_or_id || x.sessionId === sid_or_id);
+    if (!s) return alert("找不到資料");
     
-    let csvContent = "Time(s),AccX(G),AccY(G),AccZ(G),VerticalAcc(G)\n";
-    if (rawSeg.rawX) {
-        for (let i = 0; i < rawSeg.rawX.length; i++) {
-            csvContent += `${(i * 0.001).toFixed(3)},${rawSeg.rawX[i]},${rawSeg.rawY[i]},${rawSeg.rawZ[i]},${rawSeg.rawV[i]}\n`;
+    if (s.isRaw) {
+        // 匯出原始 1000Hz 資料 (X, Y, Z, V)
+        let csvContent = "Time(s),AccX(G),AccY(G),AccZ(G),VerticalAcc(G)\n";
+        if (s.rawX) {
+            for (let i = 0; i < s.rawX.length; i++) {
+                csvContent += `${(i * 0.001).toFixed(3)},${s.rawX[i]},${s.rawY[i]},${s.rawZ[i]},${s.rawV[i]}\n`;
+            }
+        } else {
+            csvContent = "Time(s),VerticalAcc(G)\n";
+            const data = s.rawData || [];
+            for (let i = 0; i < data.length; i++) {
+                csvContent += `${(i * 0.001).toFixed(3)},${data[i]}\n`;
+            }
         }
+        downloadCSV(csvContent, `raw_1000Hz_${new Date(s.sessionId).toISOString().slice(0,19)}.csv`);
     } else {
-        csvContent = "Time(s),VerticalAcc(G)\n";
-        const data = rawSeg.rawData || [];
-        for (let i = 0; i < data.length; i++) {
-            csvContent += `${(i * 0.001).toFixed(3)},${data[i]}\n`;
-        }
+        // 匯出分析後的摘要資料
+        let csvContent = "Note,Date,Time Range,Peak Acc(G),Peak RFD(G/s)\n";
+        csvContent += `"${s.note}",${s.date},"${s.timeRange}",${s.peakAcc.toFixed(4)},${s.peakRFD.toFixed(4)}\n`;
+        downloadCSV(csvContent, `analyzed_rep_${s.id}.csv`);
     }
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+};
+
+function downloadCSV(content, filename) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `vbt_raw_${new Date(sid).toISOString().slice(0,19).replace(/:/g,'-')}.csv`);
+    link.setAttribute("download", filename);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-};
+}
 
 document.getElementById('saveRawSetBtn').addEventListener('click', saveRawSet);
 
@@ -501,6 +665,7 @@ window.loadToAnalyzer = function(sid) {
     recordChart.update();
     document.getElementById('analyzeRangeBtn').disabled = false;
     document.getElementById('saveRawSetBtn').disabled = false;
+    document.getElementById('discardDataBtn').disabled = false;
     
     // 切換分頁
     document.querySelectorAll('.tab, .content-section').forEach(el => el.classList.remove('active'));
@@ -513,13 +678,25 @@ window.loadToAnalyzer = function(sid) {
 };
 
 function renderCurrentSession(startTime) {
-    const sessionReps = segments.filter(s => s.absStartTime >= startTime);
+    // 過濾出屬於本次 Session 的所有 Reps (排除原始資料)
+    const sessionReps = segments.filter(s => (s.sessionId === startTime || s.absStartTime >= startTime) && !s.isRaw);
     const list = document.getElementById('currentSessionList');
-    list.innerHTML = sessionReps.slice().reverse().map(s => `
-        <div class="history-item">
-            <div class="history-info"><span class="history-note" onclick="editNote(${s.id})">${s.note}</span><span style="font-size:0.6rem; color:#999;">${s.timeRange}</span></div>
-            <div style="text-align:right;"><div class="history-vals">${s.peakAcc.toFixed(2)}G</div><button onclick="deleteSegment(${s.id}, true)" class="btn-sm btn-danger">刪除</button></div>
-        </div>`).join('');
+    if (list) {
+        list.innerHTML = sessionReps.slice().reverse().map(s => `
+            <div class="history-item">
+                <div class="history-info">
+                    <span class="history-note" onclick="editNote(${s.id})">${s.note}</span>
+                    <span style="font-size:0.6rem; color:#999;">${s.timeRange}</span>
+                </div>
+                <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
+                    <div class="history-vals">${s.peakAcc.toFixed(2)}G</div>
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="showRepDetail(${s.id})" class="btn-sm btn-info" style="padding:2px 8px;">📈 VT</button>
+                        <button onclick="deleteSegment(${s.id}, true)" class="btn-sm btn-danger" style="padding:2px 8px;">刪除</button>
+                    </div>
+                </div>
+            </div>`).join('');
+    }
     
     if (sessionReps.length > 0) {
         document.getElementById('sessionTrendPanel').style.display = 'block';
@@ -547,61 +724,58 @@ function updateHistoryUI() {
 
     const sets = Array.from(setsMap.values()).sort((a, b) => a.id - b.id);
     const reverseSets = [...sets].reverse();
+    const historyListMain = document.getElementById('historyListMain');
+    const historyListDrawer = document.getElementById('historyList');
+    
+    const renderSetsHTML = (set) => {
+        const actualReps = set.reps.filter(r => !r.isRaw);
+        if (actualReps.length === 0 && !set.reps.some(r => r.isRaw)) return ""; 
 
-    document.getElementById('historyList').innerHTML = reverseSets.map((set, idx) => {
-        const bestAcc = Math.max(...set.reps.map(r => r.peakAcc));
-        const avgAcc = set.reps.reduce((a, b) => a + b.peakAcc, 0) / set.reps.length;
-        const bestRFD = Math.max(...set.reps.map(r => r.peakRFD));
-        const setNum = sets.length - idx;
+        const bestAcc = actualReps.length > 0 ? Math.max(...actualReps.map(r => r.peakAcc)) : 0;
+        
         return `
-        <div class="history-item" style="flex-direction:column; align-items:stretch; gap:10px; border-left: 5px solid var(--primary); cursor:pointer;" onclick="showSetDetail(${set.id})">
-            <div style="display:flex; justify-content:space-between; align-items:start;">
+        <div class="history-item" onclick="showSetDetail(${set.id})" style="flex-direction:column; align-items:stretch; gap:12px; border-left: 5px solid var(--primary); margin-bottom:15px; padding:15px; cursor:pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div class="history-info">
                     <span style="font-size:0.7rem; color:#999;">${set.date}</span>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span class="history-note" style="text-decoration:none; cursor:pointer; font-size:1rem;">${set.note}</span>
-                        <span onclick="event.stopPropagation(); editSetNote(${set.id})" style="font-size:0.7rem; cursor:pointer; background:#EEE; padding:2px 6px; border-radius:4px; opacity:0.7; display:inline-flex; align-items:center; gap:3px;">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                            編輯
-                        </span>
-                        ${set.reps.some(r => r.isRaw) ? `
-                            <span onclick="event.stopPropagation(); loadToAnalyzer(${set.id})" style="font-size:0.7rem; cursor:pointer; background:var(--warning); color:white; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">🔍 啟動分析器</span>
-                            <span onclick="event.stopPropagation(); exportRawCSV(${set.id})" style="font-size:0.7rem; cursor:pointer; background:var(--success); color:white; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">📥 匯出 CSV</span>
-                        ` : ''}
-                    </div>
-                    <div style="margin-top:4px;">
-                        ${set.reps.map((r, i) => `<span style="font-size:0.6rem; background:#F0F0F0; padding:1px 4px; border-radius:3px; margin-right:3px;">R${i+1}:${r.peakAcc.toFixed(1)}</span>`).join('')}
+                        <span class="history-note" style="font-size:1.1rem; font-weight:bold;">${set.note}</span>
+                        <span onclick="event.stopPropagation(); editSetNote(${set.id})" style="cursor:pointer; opacity:0.6;">✏️</span>
                     </div>
                 </div>
                 <div style="text-align:right;">
-                    <div class="history-vals" style="color:var(--primary); font-size:1.1rem;">${bestAcc.toFixed(2)}G</div>
-                    <div style="font-size:0.7rem; color:#666;">平均: ${avgAcc.toFixed(2)}G | ${set.reps.length} 次</div>
+                    <div style="font-size:0.8rem; color:#666;">最佳表現</div>
+                    <div class="history-vals" style="color:var(--primary); font-size:1.2rem;">${bestAcc.toFixed(2)}G</div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #F5F5F5; pt:5px; margin-top:5px;">
-                <button onclick="event.stopPropagation(); deleteSet(${set.id})" class="btn-sm btn-danger" style="padding:2px 8px; font-size:0.6rem;">刪除此組</button>
+            
+            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap:8px;">
+                ${actualReps.map((r, i) => `
+                    <button onclick="event.stopPropagation(); showRepDetail(${r.id})" style="border:1px solid #DDD; background:white; border-radius:6px; padding:6px 2px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer;">
+                        <span style="font-size:0.6rem; color:#777;">Rep ${i+1}</span>
+                        <span style="font-weight:bold; font-size:0.85rem;">${r.peakAcc.toFixed(1)}G</span>
+                        <span style="font-size:0.7rem; color:var(--info);">📈 圖表</span>
+                    </button>
+                `).join('')}
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px; border-top:1px solid #F0F0F0; pt:8px;">
+                <div style="display:flex; gap:8px;">
+                    ${set.reps.some(r => r.isRaw) ? `
+                        <button onclick="event.stopPropagation(); loadToAnalyzer(${set.id})" class="btn-sm btn-info" style="font-size:0.7rem;">🔍 切分分析</button>
+                        <button onclick="event.stopPropagation(); exportData(${set.id})" class="btn-sm btn-success" style="font-size:0.7rem;">📥 匯出原始 CSV</button>
+                    ` : `
+                        <button onclick="event.stopPropagation(); exportData(${set.id})" class="btn-sm btn-success" style="font-size:0.7rem;">📥 匯出報表 CSV</button>
+                    `}
+                </div>
+                <button onclick="event.stopPropagation(); deleteSet(${set.id})" class="btn-sm btn-danger" style="font-size:0.7rem; background:transparent; color:var(--danger); border:none;">刪除此組</button>
             </div>
         </div>`;
-    }).join('');
+    };
 
-    if (segments.length > 0) {
-        const avgAcc = segments.reduce((a, b) => a + b.peakAcc, 0) / segments.length;
-        const avgRFD = segments.reduce((a, b) => a + b.peakRFD, 0) / segments.length;
-        const chronoSorted = [...segments].sort((a, b) => a.absStartTime - b.absStartTime);
-        const fatigue = chronoSorted.length > 1 ? ((chronoSorted[0].peakAcc - chronoSorted[chronoSorted.length-1].peakAcc) / chronoSorted[0].peakAcc * 100) : 0;
-        document.getElementById('sumAvgAcc').innerText = avgAcc.toFixed(2) + " G";
-        document.getElementById('sumAvgRFD').innerText = avgRFD.toFixed(0);
-        document.getElementById('sumFatigue').innerText = fatigue.toFixed(1) + "%";
-
-        historyChart.data.labels = chronoSorted.map((s, i) => {
-            const setIdx = sets.findIndex(set => set.reps.includes(s));
-            const repIdxInSet = sets[setIdx].reps.indexOf(s);
-            return `S${setIdx+1}-R${repIdxInSet+1}`;
-        });
-        historyChart.data.datasets[0].data = chronoSorted.map(s => s.peakAcc);
-        historyChart.data.datasets[1].data = chronoSorted.map(s => s.peakRFD);
-        historyChart.update();
-    }
+    const fullHTML = reverseSets.map(renderSetsHTML).join('');
+    if (historyListMain) historyListMain.innerHTML = fullHTML;
+    if (historyListDrawer) historyListDrawer.innerHTML = fullHTML;
 }
 
 window.toggleHistoryDrawer = function(show) {
@@ -615,30 +789,61 @@ window.toggleHistoryDrawer = function(show) {
     }
 };
 
-document.getElementById('openHistoryDrawerBtn').addEventListener('click', () => toggleHistoryDrawer(true));
-document.getElementById('fabList').addEventListener('click', () => toggleHistoryDrawer(true));
+// 歷史清單相關事件
 document.querySelector('.drawer-overlay').addEventListener('click', (e) => { if(e.target === e.currentTarget) toggleHistoryDrawer(false); });
 
+// 移除舊有的 showSetDetail 邏輯，因為現在直接顯示列表資料項
 window.showSetDetail = function(sid) {
-    const reps = segments.filter(s => (s.sessionId || (Math.floor(s.absStartTime/60000)*60000)) === sid);
-    if (reps.length === 0) return;
+    // 取得該組的所有分析後 Reps
+    const setReps = segments.filter(s => {
+        const s_sid = s.sessionId || (Math.floor(s.absStartTime/60000)*60000);
+        return s_sid === sid && !s.isRaw;
+    }).sort((a, b) => a.absStartTime - b.absStartTime);
     
-    toggleHistoryDrawer(false);
-    document.getElementById('historyChartTitle').innerText = `📊 組細節: ${reps[0].note}`;
-    document.getElementById('resetHistoryChartBtn').style.display = 'block';
+    if (setReps.length === 0) return;
     
-    historyChart.data.labels = reps.map((_, i) => `R${i+1}`);
-    historyChart.data.datasets[0].data = reps.map(r => r.peakAcc);
-    historyChart.data.datasets[1].data = reps.map(r => r.peakRFD);
-    historyChart.update();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    currentDetailSetId = sid;
+    const s0 = setReps[0];
+    document.getElementById('setDetailTitle').innerText = `組細節: ${s0.note || '未命名'}`;
+    
+    // 更新趨勢圖
+    setTrendChart.data.labels = setReps.map((_, i) => `R${i+1}`);
+    setTrendChart.data.datasets[0].data = setReps.map(r => r.peakAcc);
+    setTrendChart.data.datasets[1].data = setReps.map(r => r.peakRFD);
+    setTrendChart.update();
+    
+    // 根據是否有原始資料動態修改匯出按鈕文字
+    const hasRaw = setReps.some(r => r.isRaw);
+    document.getElementById('setDetailExportBtn').innerText = hasRaw ? "📥 匯出原始 CSV" : "📥 匯出報表 CSV";
+    // 更新 Rep 列表 (按鈕也要加 stopPropagation)
+    document.getElementById('setRepList').innerHTML = setReps.map((r, i) => `
+        <button onclick="event.stopPropagation(); showRepDetail(${r.id})" style="border:1px solid #DDD; background:white; border-radius:6px; padding:8px 4px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer;">
+            <span style="font-size:0.6rem; color:#777;">Rep ${i+1}</span>
+            <span style="font-weight:bold; font-size:0.9rem;">${r.peakAcc.toFixed(1)}G</span>
+            <span style="font-size:0.6rem; color:var(--info);">📈 波形</span>
+        </button>
+    `).join('');
+    
+    // 確保沒有其他視窗開啟
+    document.getElementById('repDetailOverlay').style.display = 'none';
+    
+    const overlay = document.getElementById('setDetailOverlay');
+    overlay.style.display = 'block';
+    setTimeout(() => document.body.classList.add('drawer-active'), 10);
 };
 
-document.getElementById('resetHistoryChartBtn').addEventListener('click', () => {
-    updateHistoryUI();
-    document.getElementById('historyChartTitle').innerText = '📈 總體趨勢 (所有 Reps)';
-    document.getElementById('resetHistoryChartBtn').style.display = 'none';
-});
+window.closeSetDetail = function() {
+    const setOverlay = document.getElementById('setDetailOverlay');
+    const repOverlay = document.getElementById('repDetailOverlay');
+    
+    setOverlay.style.display = 'none';
+    // 只有當 Rep 細節也沒開時，才徹底移除背景遮罩與 active 狀態
+    if (repOverlay.style.display !== 'block') {
+        document.body.classList.remove('drawer-active');
+    }
+};
+
+
 
 window.editSetNote = function(sid) {
     const reps = segments.filter(x => (x.sessionId || (Math.floor(x.absStartTime/60000)*60000)) === sid);
@@ -669,6 +874,93 @@ window.deleteSegment = function(id, isCurrentSession = false) {
     if(!confirm("確定刪除此 Rep？")) return;
     segments = segments.filter(s => s.id !== id); saveSegments(); updateHistoryUI();
     if(isCurrentSession) renderCurrentSession(sessionStartTime);
+    closeRepDetail();
+};
+
+window.showRepDetail = function(id) {
+    const s = segments.find(x => x.id === id); if (!s) return;
+    const sid = s.sessionId;
+    
+    // 優先從 Rep 自身儲存的切片中讀取波形
+    let accData = s.rawV || s.rawData;
+    
+    // 如果 Rep 沒存波形 (舊資料)，才嘗試從該 Session 的原始大檔中提取
+    if (!accData || accData.length === 0) {
+        const rawSeg = segments.find(x => x.sessionId === sid && x.isRaw);
+        if (rawSeg) {
+            const parts = s.timeRange.replace('s','').split(' - ');
+            const startT = parseFloat(parts[0]), endT = parseFloat(parts[1]);
+            const startIdx = Math.floor(startT * 1000), endIdx = Math.floor(endT * 1000);
+            const source = rawSeg.rawV || rawSeg.rawData;
+            if (source) {
+                accData = source.slice(startIdx, endIdx);
+            }
+        }
+    }
+    
+    if (!accData || accData.length === 0) {
+        return alert("找不到該 Rep 的波形數據，無法顯示 VT 圖。");
+    }
+    
+    // 如果沒找到 raw，至少顯示當前點 (雖然不準)
+    if (accData.length === 0) return alert("此項目缺少原始加速度數據，無法產生 v-t 圖。請確保錄製後有點擊「儲存原始資料」。");
+
+    document.getElementById('repDetailTitle').innerText = `Rep 細節: ${s.note}`;
+    document.getElementById('detailPeakAcc').innerText = s.peakAcc.toFixed(2) + " G";
+    
+    // --- 速度積分運算 (含漂移修正) ---
+    const dt = 0.001; // 1000Hz
+    const n = accData.length;
+    
+    // 1. 基準校正 (Baseline Removal): 取前 30ms 平均作為零點
+    let baseline = 0; const baseN = Math.min(30, n);
+    for(let i=0; i<baseN; i++) baseline += accData[i];
+    baseline /= baseN;
+    
+    const correctedAcc = accData.map(a => (a - baseline) * 9.81); // 轉為 m/s^2
+    
+    // 2. 積分
+    let vel = new Float32Array(n);
+    let currentV = 0;
+    for(let i=0; i<n; i++) {
+        currentV += correctedAcc[i] * dt;
+        vel[i] = currentV;
+    }
+    
+    // 3. 線性漂移修正 (Linear Drift Correction): 強制終點速度為 0
+    const vend = vel[n-1];
+    for(let i=0; i<n; i++) {
+        vel[i] -= vend * (i / (n-1));
+    }
+    
+    let peakVel = 0; vel.forEach(v => { if(v > peakVel) peakVel = v; });
+    document.getElementById('detailPeakVel').innerText = peakVel.toFixed(2) + " m/s";
+
+    // 更新圖表
+    repAccChart.data.datasets[0].data = accData.map((a, i) => ({ x: i*dt, y: a }));
+    repAccChart.update('none');
+    
+    repVelChart.data.datasets[0].data = Array.from(vel).map((v, i) => ({ x: i*dt, y: v }));
+    repVelChart.update('none');
+
+    // 設定按鈕行為
+    document.getElementById('detailEditNoteBtn').onclick = () => editNote(id);
+    document.getElementById('detailDeleteBtn').onclick = () => deleteSegment(id, true);
+
+    const overlay = document.getElementById('repDetailOverlay');
+    overlay.style.display = 'block';
+    setTimeout(() => document.body.classList.add('drawer-active'), 10);
+};
+
+window.closeRepDetail = function() {
+    const repOverlay = document.getElementById('repDetailOverlay');
+    const setOverlay = document.getElementById('setDetailOverlay');
+    
+    repOverlay.style.display = 'none';
+    // 只有當組細節也沒開時，才徹底移除背景遮罩與 active 狀態
+    if (setOverlay.style.display !== 'block') {
+        document.body.classList.remove('drawer-active');
+    }
 };
 
 document.getElementById('clearHistoryBtn').addEventListener('click', () => {
@@ -682,13 +974,6 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab, .content-section').forEach(el => el.classList.remove('active'));
     tab.classList.add('active'); 
     document.getElementById(tab.dataset.tab).classList.add('active');
-    
-    // 控制懸浮按鈕顯示
-    if (tab.dataset.tab === 'history') {
-        document.getElementById('fabList').classList.add('fab-active');
-    } else {
-        document.getElementById('fabList').classList.remove('fab-active');
-    }
   });
 });
 
