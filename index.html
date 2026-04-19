@@ -184,15 +184,12 @@
             <div style="font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:5px;">📈 速度 (Vel-t) <span style="font-weight:normal; font-size:0.6rem;">(經過漂移修正積分)</span></div>
             <div class="chart-container" style="height: 200px;"><canvas id="repVelChart"></canvas></div>
             
-            <div style="margin-top:20px; display:flex; gap:10px;">
-                <button id="detailEditNoteBtn" class="btn btn-primary" style="flex:1; font-size:0.9rem;">修改備註</button>
-                <button id="detailDeleteBtn" class="btn btn-danger" style="flex:1; font-size:0.9rem;">刪除此 Rep</button>
+            <div style="display:flex; justify-content:flex-end; margin-top:20px; padding-top:15px; border-top:1px solid #F0F0F0;">
+                <button id="detailDeleteBtn" class="btn-sm btn-danger" style="background:transparent; color:var(--danger); border:none; font-size:0.75rem;">🗑️ 刪除此 Rep</button>
             </div>
         </div>
     </div>
   </div>
-
-  <!-- Floating Button 被移除，因與瀏覽歷史紀錄按鈕功能重複 -->
 
   <!-- Set Detail Overlay -->
   <div id="setDetailOverlay" class="drawer-overlay">
@@ -208,9 +205,9 @@
             <div style="font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:10px;">📋 動作清單 (點擊看波形)</div>
             <div id="setRepList" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap:10px;"></div>
             
-            <div style="margin-top:25px; display:flex; gap:10px;">
-                <button id="setDetailExportBtn" onclick="exportData(currentDetailSetId)" class="btn btn-primary" style="flex:1; font-size:0.9rem;">📥 匯出數據 CSV</button>
-                <button onclick="deleteSet(currentDetailSetId); closeSetDetail();" class="btn btn-danger" style="flex:1; font-size:0.9rem;">🗑️ 刪除整組</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:15px; border-top:1px solid #F0F0F0;">
+                <button id="setDetailExportBtn" onclick="exportData(currentDetailSetId)" class="btn-sm btn-success" style="font-size:0.75rem; padding:6px 15px;">📥 匯出數據 CSV</button>
+                <button onclick="deleteSet(currentDetailSetId); closeSetDetail();" class="btn-sm btn-danger" style="background:transparent; color:var(--danger); border:none; font-size:0.75rem;">🗑️ 刪除整組</button>
             </div>
         </div>
     </div>
@@ -740,7 +737,6 @@ function updateHistoryUI() {
                     <span style="font-size:0.7rem; color:#999;">${set.date}</span>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span class="history-note" style="font-size:1.1rem; font-weight:bold;">${set.note}</span>
-                        <span onclick="event.stopPropagation(); editSetNote(${set.id})" style="cursor:pointer; opacity:0.6;">✏️</span>
                     </div>
                 </div>
                 <div style="text-align:right;">
@@ -762,11 +758,12 @@ function updateHistoryUI() {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px; border-top:1px solid #F0F0F0; pt:8px;">
                 <div style="display:flex; gap:8px;">
                     ${set.reps.some(r => r.isRaw) ? `
-                        <button onclick="event.stopPropagation(); loadToAnalyzer(${set.id})" class="btn-sm btn-info" style="font-size:0.7rem;">🔍 切分分析</button>
-                        <button onclick="event.stopPropagation(); exportData(${set.id})" class="btn-sm btn-success" style="font-size:0.7rem;">📥 匯出原始 CSV</button>
+                        <button onclick="event.stopPropagation(); loadToAnalyzer(${set.id})" class="btn-sm btn-info" style="font-size:0.7rem;">🔍 切分</button>
+                        <button onclick="event.stopPropagation(); exportData(${set.id})" class="btn-sm btn-success" style="font-size:0.7rem;">📥 匯出原始</button>
                     ` : `
-                        <button onclick="event.stopPropagation(); exportData(${set.id})" class="btn-sm btn-success" style="font-size:0.7rem;">📥 匯出報表 CSV</button>
+                        <button onclick="event.stopPropagation(); exportData(${set.id})" class="btn-sm btn-success" style="font-size:0.7rem;">📥 匯出報表</button>
                     `}
+                    <button onclick="event.stopPropagation(); editSetNote(${set.id})" class="btn-sm btn-info" style="font-size:0.7rem; background:#F0F0F0; color:#555; border:1px solid #DDD;">✏️ 備註</button>
                 </div>
                 <button onclick="event.stopPropagation(); deleteSet(${set.id})" class="btn-sm btn-danger" style="font-size:0.7rem; background:transparent; color:var(--danger); border:none;">刪除此組</button>
             </div>
@@ -912,12 +909,17 @@ window.showRepDetail = function(id) {
     const dt = 0.001; // 1000Hz
     const n = accData.length;
     
-    // 1. 基準校正 (Baseline Removal): 取前 30ms 平均作為零點
-    let baseline = 0; const baseN = Math.min(30, n);
-    for(let i=0; i<baseN; i++) baseline += accData[i];
-    baseline /= baseN;
+    // 1. 基準校正 (Baseline Removal): 動態取前段平均作為零點
+    // 考慮到 1000Hz 靜止期較長，取前 500ms，但限制不超過總長的 25% 以防包含動作
+    let baseline = 0; 
+    const baseN = Math.min(500, Math.floor(n * 0.25)); 
+    if (baseN > 0) {
+        for(let i=0; i<baseN; i++) baseline += accData[i];
+        baseline /= baseN;
+    }
     
-    const correctedAcc = accData.map(a => (a - baseline) * 9.81); // 轉為 m/s^2
+    // 將加速度偏移扣除，並轉換為 m/s^2
+    const correctedAcc = accData.map(a => (a - baseline) * 9.81); 
     
     // 2. 積分
     let vel = new Float32Array(n);
@@ -933,8 +935,9 @@ window.showRepDetail = function(id) {
         vel[i] -= vend * (i / (n-1));
     }
     
-    let peakVel = 0; vel.forEach(v => { if(v > peakVel) peakVel = v; });
-    document.getElementById('detailPeakVel').innerText = peakVel.toFixed(2) + " m/s";
+    let maxV = 0;
+    for(let i=0; i<n; i++) { if(Math.abs(vel[i]) > maxV) maxV = Math.abs(vel[i]); }
+    document.getElementById('detailPeakVel').innerText = maxV.toFixed(2) + " m/s";
 
     // 更新圖表
     repAccChart.data.datasets[0].data = accData.map((a, i) => ({ x: i*dt, y: a }));
@@ -944,7 +947,6 @@ window.showRepDetail = function(id) {
     repVelChart.update('none');
 
     // 設定按鈕行為
-    document.getElementById('detailEditNoteBtn').onclick = () => editNote(id);
     document.getElementById('detailDeleteBtn').onclick = () => deleteSegment(id, true);
 
     const overlay = document.getElementById('repDetailOverlay');
